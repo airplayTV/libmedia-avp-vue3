@@ -21,6 +21,7 @@
   "files": [
     "dist",
     "runtime-assets",
+    "docs",
     "README.md",
     "LICENSE",
     "THIRD_PARTY_LICENSES.md"

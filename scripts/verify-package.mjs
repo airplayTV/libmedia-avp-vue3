@@ -47,6 +47,8 @@ try {
     'dist/vite/index.js',
     'dist/vite/index.cjs',
     'dist/vite/index.d.ts',
+    'docs/cdn-deployment.md',
+    'docs/troubleshooting.md',
     'runtime-assets/manifest.json'
   ]
   for (const fileName of requiredFiles) {
