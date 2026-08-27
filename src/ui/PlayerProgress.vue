@@ -69,9 +69,13 @@ function onPointerCancel(event) {
 }
 
 function onKeydown(event) {
+  const keyboardStep = Math.min(
+    5,
+    Math.max(0.1, props.duration / 10)
+  )
   const actions = {
-    ArrowLeft: () => clamp(props.currentTime - 5),
-    ArrowRight: () => clamp(props.currentTime + 5),
+    ArrowLeft: () => clamp(props.currentTime - keyboardStep),
+    ArrowRight: () => clamp(props.currentTime + keyboardStep),
     Home: () => 0,
     End: () => clamp(props.duration)
   }

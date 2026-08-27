@@ -20,8 +20,8 @@ class UiController {
     this.emit('ready', { duration: 120, state: PlayerState.READY })
   }
 
-  async play() {
-    this.calls.push(['play'])
+  async play(options) {
+    this.calls.push(['play', options])
     this.emit('statechange', { state: PlayerState.PLAYING, previousState: PlayerState.READY })
     this.emit('play', { state: PlayerState.PLAYING })
   }
@@ -101,6 +101,27 @@ describe('LibmediaPlayer', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }))
     await flushPromises()
     expect(harness.controller().calls.filter(([name]) => name === 'play')).toHaveLength(1)
+  })
+
+  it('falls back to video-only playback when AudioContext is unavailable', async () => {
+    const originalAudioContext = globalThis.AudioContext
+    const originalWebkitAudioContext = globalThis.webkitAudioContext
+    delete globalThis.AudioContext
+    delete globalThis.webkitAudioContext
+    const harness = mountPlayer()
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-control-button').trigger('click')
+    await flushPromises()
+
+    expect(harness.controller().calls).toContainEqual([
+      'play',
+      { video: true, audio: false }
+    ])
+    if (originalAudioContext) globalThis.AudioContext = originalAudioContext
+    if (originalWebkitAudioContext) {
+      globalThis.webkitAudioContext = originalWebkitAudioContext
+    }
   })
 
   it('hides controls after three idle playing seconds but preserves focused controls', async () => {

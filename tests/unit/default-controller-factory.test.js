@@ -18,10 +18,11 @@ const manifest = {
 
 describe('default controller factory', () => {
   it('loads the manifest and runtime from the configured asset base', async () => {
+    let receivedEngineOptions
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => manifest }))
     const importer = vi.fn(async () => ({
       default: class FakeAVPlayer {
-        constructor(options) { this.options = options }
+        constructor(options) { receivedEngineOptions = options }
         load() {}
         play() {}
       }
@@ -44,6 +45,7 @@ describe('default controller factory', () => {
     )
 
     await controller.play()
+    expect(receivedEngineOptions.enableWorker).toBe(false)
     expect(importer).toHaveBeenCalledWith(
       'https://cdn.example/libmedia/runtime/avplayer.js'
     )

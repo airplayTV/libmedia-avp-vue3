@@ -51,6 +51,9 @@
     "assets:sync": "node scripts/sync-libmedia-assets.mjs",
     "test:vite-matrix": "node scripts/test-vite-matrix.mjs",
     "verify:package": "node scripts/verify-package.mjs",
+    "playground:dev": "vite --config playground/vite.config.js",
+    "playground:build": "vite build --config playground/vite.config.js",
+    "test:browser": "playwright test",
     "pack:check": "npm pack --dry-run"
   }
 }

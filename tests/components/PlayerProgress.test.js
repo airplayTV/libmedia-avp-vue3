@@ -33,6 +33,16 @@ describe('PlayerProgress', () => {
     expect(wrapper.emitted('seek')).toEqual([[120], [120], [0], [0]])
   })
 
+  it('uses a proportional keyboard step for very short media', async () => {
+    const wrapper = mount(PlayerProgress, {
+      props: { currentTime: 0, duration: 2 }
+    })
+
+    await wrapper.trigger('keydown', { key: 'ArrowRight' })
+
+    expect(wrapper.emitted('seek')).toEqual([[0.2]])
+  })
+
   it('emits previews while dragging and one committed seek on release', async () => {
     const wrapper = mount(PlayerProgress, {
       props: { currentTime: 0, duration: 100 }

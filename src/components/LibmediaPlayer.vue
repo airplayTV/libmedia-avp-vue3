@@ -117,11 +117,21 @@ function run(command) {
   void Promise.resolve(command).catch(() => {})
 }
 
+function defaultPlayOptions() {
+  const hasAudioContext = (
+    typeof globalThis.AudioContext === 'function' ||
+    typeof globalThis.webkitAudioContext === 'function'
+  )
+  return hasAudioContext ? undefined : { video: true, audio: false }
+}
+
+const play = (options = defaultPlayOptions()) => coreRef.value?.play(options)
+
 function togglePlayback() {
   showControls()
   run(state.value === PlayerState.PLAYING
     ? coreRef.value?.pause()
-    : coreRef.value?.play())
+    : play())
 }
 
 function seekTo(value) {
@@ -186,7 +196,6 @@ function handleKeydown(event) {
 }
 
 const load = (source = props.src) => coreRef.value?.load(source)
-const play = () => coreRef.value?.play()
 const pause = () => coreRef.value?.pause()
 const stop = () => coreRef.value?.stop()
 const seek = (seconds) => coreRef.value?.seek(seconds)
@@ -261,7 +270,7 @@ onBeforeUnmount(clearHideTimer)
       :error="publicError"
       :poster="poster"
       @retry="run(core.load(src))"
-      @play="run(core.play())"
+      @play="run(play())"
     >
       <template v-if="$slots.loading" #loading="slotProps">
         <slot name="loading" v-bind="slotProps" />

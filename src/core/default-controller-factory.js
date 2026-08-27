@@ -54,7 +54,10 @@ export async function createDefaultController(options, dependencies = {}) {
   return new PlayerController({
     container: options.container,
     source: options.source,
-    engineOptions: options.engineOptions,
+    engineOptions: {
+      enableWorker: false,
+      ...options.engineOptions
+    },
     loadOptions: options.loadOptions,
     assetResolver,
     onEvent: options.onEvent,
