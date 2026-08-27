@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { h } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 import LibmediaPlayerCore from '../../src/components/LibmediaPlayerCore.vue'
 import { LIBMEDIA_CONTROLLER_FACTORY } from '../../src/composables/use-libmedia-player.js'
@@ -42,6 +43,40 @@ afterEach(() => {
 })
 
 describe('LibmediaPlayerCore', () => {
+  it('provides custom-control commands through its default slot', async () => {
+    const controller = new CoreController()
+    let slotProps
+    const wrapper = mount(LibmediaPlayerCore, {
+      props: { src: null },
+      slots: {
+        default: (props) => {
+          slotProps = props
+          return h('div')
+        }
+      },
+      global: {
+        provide: {
+          [LIBMEDIA_CONTROLLER_FACTORY]: async () => controller
+        }
+      }
+    })
+    await flushPromises()
+
+    expect(slotProps).toMatchObject({
+      play: expect.any(Function),
+      seek: expect.any(Function),
+      setPlaybackRate: expect.any(Function),
+      getVideoList: expect.any(Function),
+      getAudioList: expect.any(Function),
+      getSubtitleList: expect.any(Function),
+      selectVideo: expect.any(Function),
+      selectAudio: expect.any(Function),
+      selectSubtitle: expect.any(Function)
+    })
+
+    wrapper.unmount()
+  })
+
   it('exposes the approved component contract and forwards sanitized events', async () => {
     const harness = mountCore({ src: 'movie.mp4', volume: 0.5 })
     await flushPromises()

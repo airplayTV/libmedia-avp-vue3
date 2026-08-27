@@ -8,13 +8,12 @@ export default defineConfig({
       entry: 'src/index.js',
       name: 'LibmediaAvpVue3',
       formats: ['es', 'cjs'],
-      fileName: (format) => format === 'es' ? 'index.js' : 'index.cjs'
+      fileName: (format) => format === 'es' ? 'index.js' : 'index.cjs',
+      cssFileName: 'style'
     },
     rollupOptions: {
       external: ['vue'],
       output: { globals: { vue: 'Vue' } }
-    },
-    cssFileName: 'style'
+    }
   }
 })
-
