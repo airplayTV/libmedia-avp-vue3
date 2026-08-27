@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 1,
+  "runtimeVersion": "1.3.1",
+  "avplayerVersion": "1.3.1",
+  "upstreamCommit": "152f629d3021fd8013efa464fcb7b55f9fbe7753",
+  "preset": "standard",
+  "variants": [
+    "baseline",
+    "simd",
+    "atomic"
+  ],
+  "codecs": [
+    "aac",
+    "ac3",
+    "adpcm",
+    "av1",
+    "dca",
+    "eac3",
+    "flac",
+    "h264",
+    "hevc",
+    "mjpeg",
+    "mp3",
+    "mpeg2video",
+    "mpeg4",
+    "opus",
+    "pcm",
+    "vorbis",
+    "vp8",
+    "vp9"
+  ],
+  "files": {
+    "runtime/163.avplayer.js": {
+      "sha256": "f6982459f57750aac6f374b13aafc7762d160c57557e06014258cbe51b6f9ec8",
+      "size": 3174
+    },
+    "runtime/182.avplayer.js": {
+      "sha256": "f05e7a4fe6dcaa18c0342982e55eb4e910ea625c818bccf0836273ccfd0ca302",
+      "size": 13010
+    },
+    "runtime/195.avplayer.js": {
+      "sha256": "6e1336f97644b1b796e6bfd63d9996d2a654b8f570309221f2a00f8f1da66c01",
+      "size": 5815
+    },
+    "runtime/199.avplayer.js": {
+      "sha256": "99407f6beb46c22447bb1f9eabb2cfe96022b2c290d4b3f1e7db6aff51c42c14",
+      "size": 7138
+    },
+    "runtime/239.avplayer.js": {
+      "sha256": "d35ac44ee530338336c3506bf8ca58f033760a9d7fb8529246576f925189fe67",
+      "size": 47862
+    },
+    "runtime/248.avplayer.js": {
+      "sha256": "9e551bfc66a0db809b681b47cf91a92db1c01528eb0bf7ac2040b4d24588ce96",
+      "size": 20276
+    },
+    "runtime/26.avplayer.js": {
+      "sha256": "a1c53e643e6504fff60e0151621cc12cf1084693d107e1357a1200162f3c21a2",
+      "size": 95381
+    },
+    "runtime/261.avplayer.js": {
+      "sha256": "cd5acdd2d6517c8b2f2508f9e55aa9578bdbdafab17fe1e9de1d6f87f53e019f",
+      "size": 26575
+    },
+    "runtime/272.avplayer.js": {
+      "sha256": "072532137d628d081210fccb18b0429674d1b59516e54b1a5b6eff54632d1763",
+      "size": 59680
+    },
+    "runtime/325.avplayer.js": {
+      "sha256": "58d93a0e98b0a70a72df371ecaa42b280b4052365cb10ff19a1ea5bf192ae51b",
+      "size": 23979
+    },
+    "runtime/33.avplayer.js": {
+      "sha256": "b26b7e0675b74238fd7bb381be33e96f7ba313573d8c709de64808113d6cf2dc",
+      "size": 10104
+    },
+    "runtime/384.avplayer.js": {
+      "sha256": "adacf9a6478ddd95b06293144a6e51213fad906493934bf426fa39793244e69f",
+      "size": 39176
+    },
+    "runtime/43.avplayer.js": {
+      "sha256": "8397d7196ac5bfddc0bb7c3224a78fcc8ac4b60128c6a3376c54d33b24e15cd9",
+      "size": 9003
+    },
+    "runtime/462.avplayer.js": {
+      "sha256": "ea31ae3b04bd2d44d41b674339153be1a5a3cefac442ca0a0ed0ef07baec216c",
+      "size": 7107
+    },
+    "runtime/502.avplayer.js": {
+      "sha256": "5ef47e824ff36959c9746e3f445e4568d67e520b239d2a384409457fa1d557a4",
+      "size": 41190
+    },
+    "runtime/573.avplayer.js": {
+      "sha256": "ffcedb0645e22f598bb5b9b322fa24cdd3dec51a7ad992061defd186a946974d",
+      "size": 44303
+    },
+    "runtime/630.avplayer.js": {
+      "sha256": "98672a6df37c601b6419e963d128e58e87365c9b0e0d501bb0e68164a02f7d94",
+      "size": 23551
+    },
+    "runtime/641.avplayer.js": {
+      "sha256": "caef502855d40f5f184673598b7b3e0bfe069eeaaa5ae42395610599fc416fee",
+      "size": 2706
+    },
+    "runtime/735.avplayer.js": {
+      "sha256": "b58d775f67ea3df48a3a541350a534281d41a43424fc7a496686495956b04269",
+      "size": 44169
+    },
+    "runtime/747.avplayer.js": {
+      "sha256": "8a229fd18f0a30987226153e319fde1ed4aebf636273603d487a8d8b887d2d5e",
+      "size": 4114
+    },
+    "runtime/749.avplayer.js": {
+      "sha256": "d1ebc7d5384c484bf5b2d880565884d573a5fabf18194a350de4c043d05eb8c1",
+      "size": 7822
+    },
+    "runtime/790.avplayer.js": {
+      "sha256": "94bc7de4b01d3fc55a768eebf8fe88283724bdf2e6913ac6b827e9de466b29a7",
+      "size": 4967
+    },
+    "runtime/794.avplayer.js": {
+      "sha256": "92bee9970297645d2d8bbe722d9f953c8d749974479cd68bf91039bc7d75c61c",
+      "size": 7523
+    },
+    "runtime/850.avplayer.js": {
+      "sha256": "94d5291d298be62c4498d88ae106dea12f1896f8bb3527d433e2073b0b149003",
+      "size": 37102
+    },
+    "runtime/881.avplayer.js": {
+      "sha256": "0fea20b8024d9df27c9f0c2487f3d2a9ae9cc6bab7ef0ac74ba01e6a206e5223",
+      "size": 32452
+    },
+    "runtime/932.avplayer.js": {
+      "sha256": "f214c3b8a1d0bba009b85a888648fd983ac70833c1205c9f42625e0d82ee6815",
+      "size": 30412
+    },
+    "runtime/943.avplayer.js": {
+      "sha256": "b600831c9ab77fcbf5db6e9786d5ceb566071c344f243c0908fcd154c3599e78",
+      "size": 85647
+    },
+    "runtime/956.avplayer.js": {
+      "sha256": "5d60e56cd6f417b57b83c893c68b933cde50c68043a661cbb8756a192b136bdd",
+      "size": 22828
+    },
+    "runtime/961.avplayer.js": {
+      "sha256": "a788dc5a67237717584b1c4526037c6c863f2675b289a8007febca6b8dffaca2",
+      "size": 7727
+    },
+    "runtime/97.avplayer.js": {
+      "sha256": "a7d1016c947e1f93c7403ed0eea0350fc8db5e40d76adbe621fcec807958a8e5",
+      "size": 34074
+    },
+    "runtime/991.avplayer.js": {
+      "sha256": "087b67f66710ba6dacd0f47aef14f48889f40196f7f4135e9d52d6d3d2bcdd75",
+      "size": 35962
+    },
+    "runtime/avplayer.js": {
+      "sha256": "641018eb119847468d9ab61779356cc837cd984d395f007de9f2e354f862cfa6",
+      "size": 585084
+    },
+    "wasm/atomic/aac.wasm": {
+      "sha256": "45e90ba204af8295db460adb50e929dd38c3ed8d27422973149737613cc4f584",
+      "size": 693542
+    },
+    "wasm/atomic/ac3.wasm": {
+      "sha256": "cd636dac0bdeae4de6972e28981c670b18e0bae80d65a218ec233e4f9d55c9a8",
+      "size": 573522
+    },
+    "wasm/atomic/adpcm.wasm": {
+      "sha256": "72002cdba8b2147d5e6a35a36b6445edf591dd6ac2601ebea800673a56dd3767",
+      "size": 395191
+    },
+    "wasm/atomic/av1.wasm": {
+      "sha256": "9a3048be7f159a6e8976349045a296c7c14a5a3d91f4e2cf52e42c2214025a63",
+      "size": 844881
+    },
+    "wasm/atomic/dca.wasm": {
+      "sha256": "870cf5feec9ef4b01abdc0a43e7726a17820b081e7d54290a679ee98041cec7a",
+      "size": 796019
+    },
+    "wasm/atomic/eac3.wasm": {
+      "sha256": "8d24b5c70ad6d46e614edfd4a63c5134f0e6f6da038aca122141a787536d8fb6",
+      "size": 598538
+    },
+    "wasm/atomic/flac.wasm": {
+      "sha256": "977d2e98a574352a1177380cbb40710ae34f9e496631fbef27e99325c42c7cfb",
+      "size": 368048
+    },
+    "wasm/atomic/h264.wasm": {
+      "sha256": "80b713f3a8b311055f3f6b654cee4c6221dfac2e2ccca470c72271af163f1e20",
+      "size": 1487365
+    },
+    "wasm/atomic/hevc.wasm": {
+      "sha256": "9d66829ccfe917892b6c0ae087bb303d77cd240bd2b178d745fcd17fbc32de72",
+      "size": 882021
+    },
+    "wasm/atomic/mjpeg.wasm": {
+      "sha256": "c6ce74b91345bdb0f171f7b8af00b3dda4706b054094cfca8b93b08ed27dc39a",
+      "size": 438011
+    },
+    "wasm/atomic/mp3.wasm": {
+      "sha256": "8d8c60cebfbce25f859dd3ed118fc5764f6cee38af033424d4bbc9241392f787",
+      "size": 390976
+    },
+    "wasm/atomic/mpeg2video.wasm": {
+      "sha256": "551efcbde4b8b70eff99c4f43d5dec48fae357c31e41156bc2416bee04777451",
+      "size": 529909
+    },
+    "wasm/atomic/mpeg4.wasm": {
+      "sha256": "af22ee3d56e4f3d32aa629800d7d2b70e04368716f80d0d70ce254092518c3f2",
+      "size": 718904
+    },
+    "wasm/atomic/opus.wasm": {
+      "sha256": "7e32ba741f83ad8e8c09cfc765dfe25cab900e24b9d606f17cdb4723142ccf86",
+      "size": 676104
+    },
+    "wasm/atomic/pcm.wasm": {
+      "sha256": "48dfd69c99678f4f9c899ae914f48c83275fe4fe49cc1ffc05ef1dbf22db677f",
+      "size": 359634
+    },
+    "wasm/atomic/resample.wasm": {
+      "sha256": "ca93bd83e7eb9d010bba5c2bd0d73cdd7f5fad8580bf60f732f7cb5b87de74eb",
+      "size": 251336
+    },
+    "wasm/atomic/stretchpitch.wasm": {
+      "sha256": "62d52214210a2e7f748cab6e18bbc1d854e76a5bc88df30449109dd6b83c9f91",
+      "size": 45775
+    },
+    "wasm/atomic/vorbis.wasm": {
+      "sha256": "a328e462a7dc009a33b8c4d66854e9f897b1f673f57d582cb5df6c406f6320ad",
+      "size": 594326
+    },
+    "wasm/atomic/vp8.wasm": {
+      "sha256": "1414f73bf7add10bddfa9c4e70fed1471fd2fc8cdc59376397354b5dcf73c8d5",
+      "size": 451417
+    },
+    "wasm/atomic/vp9.wasm": {
+      "sha256": "4371092739b7eef4f2be36d8b9d3243870bef6b6de6ca6585d59634c7d9c5338",
+      "size": 565125
+    },
+    "wasm/baseline/aac.wasm": {
+      "sha256": "9cbef85899775c7431dfffbd704d30fa185089f1f4280e2ea90be07e40b635c8",
+      "size": 694438
+    },
+    "wasm/baseline/ac3.wasm": {
+      "sha256": "d2803836e5a9f69266312db639f07dd60f61189a017df3cf7d19aa98d512b754",
+      "size": 576905
+    },
+    "wasm/baseline/adpcm.wasm": {
+      "sha256": "d42fc675b2f28e05990dfd44649c413a648b0177140f1b7e43427844561a378d",
+      "size": 396908
+    },
+    "wasm/baseline/av1.wasm": {
+      "sha256": "e790ed307fbf863d521c4d963bdcfacb48e225aaad81338d980ce469b2d3c34f",
+      "size": 841406
+    },
+    "wasm/baseline/dca.wasm": {
+      "sha256": "2624086c71822ff6a5a229bc216241e36bb7b7bb94c5e0357c9943f7a89aa5d5",
+      "size": 794225
+    },
+    "wasm/baseline/eac3.wasm": {
+      "sha256": "2329e65263f9aa04cce5ced5e134c53316b67d2682f44325e6f3b5a982219461",
+      "size": 601595
+    },
+    "wasm/baseline/flac.wasm": {
+      "sha256": "60023457a89eaa041957773d6a4a6c196df17df642a924746faacf535f874dca",
+      "size": 372252
+    },
+    "wasm/baseline/h264.wasm": {
+      "sha256": "b74abea1d814b89dd66d5072f9e0845db6d6b05102536560ed6141025d602120",
+      "size": 1454882
+    },
+    "wasm/baseline/hevc.wasm": {
+      "sha256": "76b2093b50690444e0ab43bfa9cd4d88d1abf93ac9875ac187304709b0406fa0",
+      "size": 881464
+    },
+    "wasm/baseline/mjpeg.wasm": {
+      "sha256": "d8c1fb2c994acaef7f699724c095c93b023df92353af59924beeda40483184c8",
+      "size": 439318
+    },
+    "wasm/baseline/mp3.wasm": {
+      "sha256": "357bc4c581f5381dc5d815c45965312dda9d2b906b823a79643fad8e4e662313",
+      "size": 392628
+    },
+    "wasm/baseline/mpeg2video.wasm": {
+      "sha256": "cc08d102e889a21dec0fd5a0ddae0bb547d63eb5f3d507b7a978b10cccd3ab93",
+      "size": 531181
+    },
+    "wasm/baseline/mpeg4.wasm": {
+      "sha256": "ceea47d2251aeb4542900a211abd588605e8556d3cbf51e4a640c05b41f58985",
+      "size": 720950
+    },
+    "wasm/baseline/opus.wasm": {
+      "sha256": "9c0ca5f7d22fe0d2557b6cb075a48dd3c3c1295dd1da0f7ef7dd36f8071d9235",
+      "size": 679540
+    },
+    "wasm/baseline/pcm.wasm": {
+      "sha256": "ec82fbecf825a34d35b979b727769cb8380bf1e06e61d30bb79a75c517655cc8",
+      "size": 361715
+    },
+    "wasm/baseline/resample.wasm": {
+      "sha256": "7709e04280d6f9487872cbcfbffa747032aaa5e45a72849a1aaceb05259b347d",
+      "size": 252290
+    },
+    "wasm/baseline/stretchpitch.wasm": {
+      "sha256": "9397d474f85fbf3d0bc6b5b78bb500d0329a7a2c4ce212c8531cd56514434a7a",
+      "size": 45783
+    },
+    "wasm/baseline/vorbis.wasm": {
+      "sha256": "fe92937f0ac4de980467da04a617e58c6f228d137862767dfdbf8694bd101aff",
+      "size": 596631
+    },
+    "wasm/baseline/vp8.wasm": {
+      "sha256": "69d84d37dd9291cb2072f33a76e9cf320b67d1fb846ea55194659d17457559e6",
+      "size": 452775
+    },
+    "wasm/baseline/vp9.wasm": {
+      "sha256": "71ce0ca267d3adf3048352a93e0146a13c32bb7f95a2243f4d11bf6f95942f15",
+      "size": 564971
+    },
+    "wasm/simd/aac.wasm": {
+      "sha256": "d261e0f99e83e403e62f88be4368e352eafb25ddc690a0aa10e9130637339b2d",
+      "size": 725214
+    },
+    "wasm/simd/ac3.wasm": {
+      "sha256": "1ff9224b6b2496fd15eb1a64cda11bbd5c750f529a830ba5a8556da82050e926",
+      "size": 599623
+    },
+    "wasm/simd/adpcm.wasm": {
+      "sha256": "4c29dfd513b6106a72b0e148c3e599fa78a99120631e216c5c2e42891a2297e1",
+      "size": 397216
+    },
+    "wasm/simd/av1.wasm": {
+      "sha256": "8764bd672a8999ed311b41814b09f62c0633d7c991d6489d1d6e2479286adb7e",
+      "size": 917671
+    },
+    "wasm/simd/dca.wasm": {
+      "sha256": "37db01491b79f5c55aeef14538bb141bd7b49e4b1db740195d0fdd4426e18880",
+      "size": 844586
+    },
+    "wasm/simd/eac3.wasm": {
+      "sha256": "47ae49394a0f0056960536e0067f9358e940f1d83c581dbf8fe7f7f2b401f049",
+      "size": 624542
+    },
+    "wasm/simd/flac.wasm": {
+      "sha256": "001370dafe5d2c05886d995a3bc147e24a91b62091f3e691584638eaadca6d36",
+      "size": 371555
+    },
+    "wasm/simd/h264.wasm": {
+      "sha256": "0c7ff22730ef4ee7b4f99e57d60b6b6212eb2a9b75de1e8190b1501d97212295",
+      "size": 1715305
+    },
+    "wasm/simd/hevc.wasm": {
+      "sha256": "63576fc0752535da9f7f1374e89ab12c22a0cd4425639f0f8162e589af7faf27",
+      "size": 1187929
+    },
+    "wasm/simd/mjpeg.wasm": {
+      "sha256": "e4bb9f2ab31a9fe4b15eb38e398f904b6def52ab7bb3283b598fe33cbd549c3d",
+      "size": 459870
+    },
+    "wasm/simd/mp3.wasm": {
+      "sha256": "b675e6ccadac5756b9e3633520699d3acdfc3063a00007e73e7d15db3a8ee5ac",
+      "size": 395341
+    },
+    "wasm/simd/mpeg2video.wasm": {
+      "sha256": "c0873083a71e3965777d170191e10d0c797a46bbe10f00bebda86451a7ce8c5b",
+      "size": 553850
+    },
+    "wasm/simd/mpeg4.wasm": {
+      "sha256": "a47ab5e8ec658609d64daa955e2ba97a0e72bb88a909485109568b144a3661a3",
+      "size": 740347
+    },
+    "wasm/simd/opus.wasm": {
+      "sha256": "1bd4eb03441a83c177f465c67a880473b04e25c205bf57838b6ecde10b0da6d8",
+      "size": 714351
+    },
+    "wasm/simd/pcm.wasm": {
+      "sha256": "916d998e855824d7aa3b2e940cd7163ce20d08c91385f87bf816e29b3d4b8008",
+      "size": 367551
+    },
+    "wasm/simd/resample.wasm": {
+      "sha256": "e4db620d0878198bcb6b8fb16035a259208b739ace8c54a6507057b4f4c5c9dd",
+      "size": 263311
+    },
+    "wasm/simd/stretchpitch.wasm": {
+      "sha256": "62d52214210a2e7f748cab6e18bbc1d854e76a5bc88df30449109dd6b83c9f91",
+      "size": 45775
+    },
+    "wasm/simd/vorbis.wasm": {
+      "sha256": "7301becd3935333c859fe8265e569513b6b90fef48ee6eb60b58ff8c2da18b52",
+      "size": 619899
+    },
+    "wasm/simd/vp8.wasm": {
+      "sha256": "e95a2a148d108dcc7e36e4133c9322a1504a5458476791853dc13e3de1c99870",
+      "size": 484930
+    },
+    "wasm/simd/vp9.wasm": {
+      "sha256": "b737e199c220902f5fbf5b9949fccc87fb122ab2ec60b6abfc2573c4c082f3aa",
+      "size": 584272
+    }
+  }
+}

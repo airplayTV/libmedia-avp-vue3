@@ -1,0 +1,16 @@
+{
+  "minimal": ["aac", "h264", "mp3"],
+  "standard": [
+    "aac", "ac3", "adpcm", "av1", "dca", "eac3", "flac", "h264",
+    "hevc", "mjpeg", "mp3", "mpeg2video", "mpeg4", "opus", "pcm",
+    "vorbis", "vp8", "vp9"
+  ],
+  "full": [
+    "aac", "ac3", "adpcm", "av1", "bmp", "dca", "dvaudio", "dvvideo",
+    "eac3", "flac", "gif", "h261", "h263", "h264", "hevc", "mjpeg",
+    "mp3", "mpeg2video", "mpeg4", "msmpeg4", "opus", "pcm", "png",
+    "ra", "rv", "speex", "theora", "tiff", "vorbis", "vp8", "vp9",
+    "vvc", "webp", "wma", "wmv"
+  ]
+}
+

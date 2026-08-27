@@ -34,7 +34,7 @@
     "build:lib": "vite build --config vite.lib.config.js",
     "build:plugin": "vite build --config vite.plugin.config.js",
     "build": "npm run build:lib && npm run build:plugin",
+    "assets:sync": "node scripts/sync-libmedia-assets.mjs",
     "pack:check": "npm pack --dry-run"
   }
 }
-
