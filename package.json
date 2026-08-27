@@ -1,0 +1,40 @@
+{
+  "name": "libmedia-avp-vue3",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": ["**/*.css"],
+  "files": [
+    "dist",
+    "runtime-assets",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.md"
+  ],
+  "peerDependencies": {
+    "vue": ">=3.3.0 <4"
+  },
+  "dependencies": {
+    "@libmedia/avplayer": "1.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^18.0.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.4",
+    "vue": "^3.5.18"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "build:lib": "vite build --config vite.lib.config.js",
+    "build:plugin": "vite build --config vite.plugin.config.js",
+    "build": "npm run build:lib && npm run build:plugin",
+    "pack:check": "npm pack --dry-run"
+  }
+}
+
