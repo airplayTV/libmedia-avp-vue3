@@ -38,6 +38,9 @@ describe('asset resolver', () => {
     })
 
     expect(resolver.variant).toBe('simd')
+    expect(resolver.runtimeUrl).toBe(
+      '/assets/libmedia-avp/runtime/avplayer.js'
+    )
     expect(resolver.getWasm('decoder', 27)).toBe(
       '/assets/libmedia-avp/wasm/simd/h264.wasm'
     )

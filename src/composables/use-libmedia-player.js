@@ -9,6 +9,7 @@ import {
 } from 'vue'
 import { PlayerError, normalizePlayerError } from '../core/player-error.js'
 import { PlayerState } from '../core/player-state.js'
+import { createDefaultController } from '../core/default-controller-factory.js'
 
 export const LIBMEDIA_CONTROLLER_FACTORY = 'libmediaControllerFactory'
 
@@ -21,7 +22,7 @@ function toPublicError(error) {
 
 export function useLibmediaPlayer(options = {}) {
   const injectedFactory = inject(LIBMEDIA_CONTROLLER_FACTORY, null)
-  const controllerFactory = options.controllerFactory ?? injectedFactory
+  const controllerFactory = options.controllerFactory ?? injectedFactory ?? createDefaultController
   const containerRef = ref(null)
   const controller = shallowRef(null)
   const state = ref(PlayerState.IDLE)
@@ -145,13 +146,6 @@ export function useLibmediaPlayer(options = {}) {
     const initialSource = unref(options.src)
 
     initializationPromise = Promise.resolve().then(async () => {
-      if (typeof controllerFactory !== 'function') {
-        throw new PlayerError(
-          'RUNTIME_LOAD_FAILED',
-          'No player controller factory was provided'
-        )
-      }
-
       const instance = await controllerFactory({
         container: containerRef.value,
         source: initialSource,

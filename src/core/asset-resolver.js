@@ -88,5 +88,9 @@ export function createAssetResolver({
     return resolveUrl(relativePath, normalizedBase)
   }
 
-  return Object.freeze({ variant, getWasm })
+  return Object.freeze({
+    variant,
+    runtimeUrl: resolveUrl('runtime/avplayer.js', normalizedBase),
+    getWasm
+  })
 }
