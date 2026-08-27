@@ -46,9 +46,11 @@
     "test:run": "vitest run",
     "build:lib": "vite build --config vite.lib.config.js",
     "build:plugin": "vite build --config vite.plugin.config.js",
-    "build": "npm run build:lib && npm run build:plugin",
+    "build:types": "node scripts/copy-types.mjs",
+    "build": "npm run build:lib && npm run build:plugin && npm run build:types",
     "assets:sync": "node scripts/sync-libmedia-assets.mjs",
     "test:vite-matrix": "node scripts/test-vite-matrix.mjs",
+    "verify:package": "node scripts/verify-package.mjs",
     "pack:check": "npm pack --dry-run"
   }
 }

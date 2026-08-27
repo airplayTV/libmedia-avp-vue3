@@ -11,16 +11,18 @@ const matrix = [
 ]
 
 function run(command, args, options = {}) {
-  const executable = process.platform === 'win32' && command === 'npm'
-    ? 'npm.cmd'
-    : command
-  const result = spawnSync(executable, args, {
+  const npmViaNode = command === 'npm' && process.env.npm_execpath
+  const executable = npmViaNode ? process.execPath : command
+  const commandArgs = npmViaNode ? [process.env.npm_execpath, ...args] : args
+  const result = spawnSync(executable, commandArgs, {
     cwd: options.cwd,
     encoding: 'utf8',
     stdio: options.capture ? 'pipe' : 'inherit'
   })
   if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(' ')} failed with exit code ${result.status}`)
+    throw new Error(
+      `${command} ${args.join(' ')} failed with exit code ${result.status}: ${result.error?.message ?? ''}`
+    )
   }
   return result.stdout
 }
