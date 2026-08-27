@@ -165,3 +165,19 @@ npm run test:browser
 浏览器自动化覆盖 Chromium、Firefox、WebKit；它不等同于目标手机、电视 WebView、硬件解码器和生产 CDN 的实机验收。
 
 错误码和定位步骤见 [故障排查](docs/troubleshooting.md)。第三方许可证与固定源码地址见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+
+## 运行 Example
+
+`example/` 是一个独立的纯 JavaScript Vue 3 消费项目，只通过包的公开导出加载组件、CSS 和 Vite 资源插件。
+
+```bash
+npm install
+npm run example:dev
+```
+
+默认地址为 `http://localhost:5173`。生产构建和 Chromium 回归：
+
+```bash
+npm run example:build
+npm run test:example
+```

@@ -4,6 +4,9 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
+  "workspaces": [
+    "example"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -54,6 +57,9 @@
     "verify:package": "node scripts/verify-package.mjs",
     "playground:dev": "vite --config playground/vite.config.js",
     "playground:build": "vite build --config playground/vite.config.js",
+    "example:dev": "npm run build && npm --prefix example run dev --",
+    "example:build": "npm run build && npm --prefix example run build",
+    "test:example": "playwright test --config playwright.example.config.js",
     "test:browser": "playwright test",
     "pack:check": "npm pack --dry-run"
   }
