@@ -6,8 +6,12 @@ import { libmediaAssets } from 'libmedia-avp-vue3/vite'
 const mediaRoot = fileURLToPath(
   new URL('../tests/fixtures/media', import.meta.url)
 )
+const base = process.env.GITHUB_PAGES === 'true'
+  ? '/libmedia-avp-vue3/'
+  : '/'
 
 export default defineConfig({
+  base,
   publicDir: mediaRoot,
   plugins: [
     vue(),

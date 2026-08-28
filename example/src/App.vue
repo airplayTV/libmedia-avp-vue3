@@ -3,9 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { gsap } from 'gsap'
 import { LibmediaPlayer } from 'libmedia-avp-vue3'
 
+const exampleBaseUrl = import.meta.env.BASE_URL
 const sources = Object.freeze({
-  mp4: '/sample.mp4',
-  hls: '/hls/sample.m3u8'
+  mp4: `${exampleBaseUrl}sample.mp4`,
+  hls: `${exampleBaseUrl}hls/sample.m3u8`
 })
 
 const source = ref(sources.mp4)
