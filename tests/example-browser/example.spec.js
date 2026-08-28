@@ -176,7 +176,7 @@ test('shows real AVPlayer media statistics and non-copyable player versions', as
   await expect(infoValue('总码率')).not.toHaveText('--')
 
   await dialog.getByRole('tab', { name: '播放器信息' }).click()
-  await expect(infoValue('播放器库版本')).toHaveText('0.1.4')
+  await expect(infoValue('播放器库版本')).toHaveText('0.1.5')
   await expect(infoValue('AVPlayer / libmedia 版本')).toHaveText('1.3.1')
   await expect(dialog.getByRole('button', { name: /^复制/ })).toHaveCount(0)
 })
