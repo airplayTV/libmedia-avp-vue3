@@ -315,6 +315,25 @@ describe('LibmediaPlayer', () => {
     expect(dialog.text()).not.toContain('must-not-render')
   })
 
+  it('shows library name, version, and a safe repository link in video information', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.text()).toContain('libmedia-avp-vue3')
+    expect(dialog.text()).toContain('0.1.2')
+    const repository = dialog.get('a[href="https://github.com/airplayTV/libmedia-avp-vue3"]')
+    expect(repository.attributes('target')).toBe('_blank')
+    expect(repository.attributes('rel')).toBe('noopener noreferrer')
+  })
+
   it('shows and copies the complete active URL without masking query parameters', async () => {
     const source = 'https://media.example/video.mp4?token=secret&sign=abc123'
     const writeText = vi.fn().mockResolvedValue(undefined)

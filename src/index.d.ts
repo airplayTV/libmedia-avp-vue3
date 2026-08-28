@@ -136,7 +136,14 @@ export interface UseLibmediaPlayerResult extends LibmediaPlayerExposed {
   destroy(): Promise<void>
 }
 
-export declare const LIBMEDIA_AVP_VERSION: '0.1.0'
+export declare const LIBMEDIA_AVP_NAME: 'libmedia-avp-vue3'
+export declare const LIBMEDIA_AVP_VERSION: '0.1.2'
+export declare const LIBMEDIA_AVP_REPOSITORY: 'https://github.com/airplayTV/libmedia-avp-vue3'
+export declare const LIBMEDIA_AVP_INFO: Readonly<{
+  name: typeof LIBMEDIA_AVP_NAME
+  version: typeof LIBMEDIA_AVP_VERSION
+  repository: typeof LIBMEDIA_AVP_REPOSITORY
+}>
 export declare const LIBMEDIA_CONTROLLER_FACTORY: 'libmediaControllerFactory'
 export declare const PlayerState: Readonly<{
   IDLE: 'idle'

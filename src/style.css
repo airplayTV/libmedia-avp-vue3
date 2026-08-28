@@ -27,7 +27,7 @@
   --libmedia-radius: 10px;
   aspect-ratio: 16 / 9;
   min-height: 180px;
-  border-radius: var(--libmedia-radius);
+  border-radius: 0;
   font-family: var(--libmedia-font-family, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   line-height: 1.4;
   outline: none;
@@ -150,6 +150,8 @@
 .libmedia-controls__volume {
   width: 86px;
   min-height: 44px;
+  border: 0;
+  background: transparent;
   accent-color: var(--libmedia-accent);
   cursor: pointer;
 }
@@ -213,6 +215,30 @@
 .libmedia-progress:focus-visible .libmedia-progress__thumb {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+}
+
+.libmedia-progress__tooltip {
+  position: absolute;
+  bottom: calc(50% + 11px);
+  left: clamp(28px, var(--libmedia-progress-hover), calc(100% - 28px));
+  z-index: 1;
+  min-width: 48px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  color: var(--libmedia-text);
+  background: rgba(5, 6, 8, 0.94);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
+  font: 600 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.libmedia-diagnostics__info a {
+  color: var(--libmedia-accent);
+  overflow-wrap: anywhere;
+  text-underline-offset: 2px;
 }
 
 .libmedia-settings {

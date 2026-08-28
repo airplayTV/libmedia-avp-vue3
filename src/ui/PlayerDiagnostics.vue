@@ -164,11 +164,19 @@ onBeforeUnmount(() => clearTimeout(copyFeedbackTimer))
         >
           <dt>{{ item.label }}</dt>
           <dd>
-            <span>{{ item.value }}</span>
+            <a
+              v-if="item.href"
+              :href="item.href"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ item.value }}
+            </a>
+            <span v-else>{{ item.value }}</span>
             <button
               v-if="item.copyable"
               type="button"
-              aria-label="复制当前文件或 URL"
+              :aria-label="item.copyLabel ?? '复制当前文件或 URL'"
               @click="copyInfo(item)"
             >
               {{ copiedLabel === item.label ? '已复制' : '复制' }}

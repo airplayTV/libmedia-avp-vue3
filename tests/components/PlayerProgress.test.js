@@ -66,4 +66,53 @@ describe('PlayerProgress', () => {
     expect(wrapper.emitted('preview')).toEqual([[25], [50], [75]])
     expect(wrapper.emitted('seek')).toEqual([[75]])
   })
+
+  it('shows the hovered media time without previewing or seeking', async () => {
+    const wrapper = mount(PlayerProgress, {
+      props: { currentTime: 30, duration: 7325 }
+    })
+    wrapper.element.getBoundingClientRect = () => ({
+      left: 10,
+      width: 200,
+      right: 210,
+      top: 0,
+      bottom: 20,
+      height: 20,
+      x: 10,
+      y: 0,
+      toJSON: () => ({})
+    })
+
+    await wrapper.trigger('pointermove', { clientX: 110, pointerType: 'mouse' })
+
+    const tooltip = wrapper.get('.libmedia-progress__tooltip')
+    expect(tooltip.text()).toBe('1:01:02')
+    expect(tooltip.attributes('style')).toContain('--libmedia-progress-hover: 50%')
+    expect(wrapper.emitted('preview')).toBeUndefined()
+    expect(wrapper.emitted('seek')).toBeUndefined()
+
+    await wrapper.trigger('pointerleave')
+    expect(wrapper.find('.libmedia-progress__tooltip').exists()).toBe(false)
+  })
+
+  it('does not expose a hover-only tooltip for touch input', async () => {
+    const wrapper = mount(PlayerProgress, {
+      props: { currentTime: 0, duration: 100 }
+    })
+    wrapper.element.getBoundingClientRect = () => ({
+      left: 0,
+      width: 100,
+      right: 100,
+      top: 0,
+      bottom: 20,
+      height: 20,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    })
+
+    await wrapper.trigger('pointermove', { clientX: 50, pointerType: 'touch' })
+
+    expect(wrapper.find('.libmedia-progress__tooltip').exists()).toBe(false)
+  })
 })

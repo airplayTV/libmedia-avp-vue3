@@ -2,6 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import LibmediaPlayerCore from './LibmediaPlayerCore.vue'
 import { PlayerState } from '../core/player-state.js'
+import {
+  LIBMEDIA_AVP_NAME,
+  LIBMEDIA_AVP_REPOSITORY,
+  LIBMEDIA_AVP_VERSION
+} from '../core/library-info.js'
 import PlayerControls from '../ui/PlayerControls.vue'
 import PlayerContextMenu from '../ui/PlayerContextMenu.vue'
 import PlayerDiagnostics from '../ui/PlayerDiagnostics.vue'
@@ -476,11 +481,22 @@ function buildVideoInfo(core) {
   const source = sourceDetails(activeSource.value)
 
   return [
+    { label: '播放器库', value: LIBMEDIA_AVP_NAME },
+    { label: '版本号', value: LIBMEDIA_AVP_VERSION },
+    {
+      label: 'GitHub 地址',
+      value: LIBMEDIA_AVP_REPOSITORY,
+      href: LIBMEDIA_AVP_REPOSITORY,
+      copyable: true,
+      copyValue: LIBMEDIA_AVP_REPOSITORY,
+      copyLabel: '复制 GitHub 地址'
+    },
     {
       label: '当前文件 / URL',
       value: source.display,
       copyable: Boolean(source.copyValue),
-      copyValue: source.copyValue
+      copyValue: source.copyValue,
+      copyLabel: '复制当前文件或 URL'
     },
     { label: '播放状态', value: stateLabels[state.value] ?? '未知状态' },
     { label: '媒体类型', value: sourceType(activeSource.value) },
