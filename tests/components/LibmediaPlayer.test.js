@@ -343,7 +343,7 @@ describe('LibmediaPlayer', () => {
     dialog = harness.wrapper.get('.libmedia-diagnostics')
     expect(dialog.get('[role="tab"][aria-selected="true"]').text()).toBe('播放器信息')
     expect(dialog.text()).toContain('libmedia-avp-vue3')
-    expect(dialog.text()).toContain('0.1.3')
+    expect(dialog.text()).toContain('0.1.4')
     const repository = dialog.get('a[href="https://github.com/airplayTV/libmedia-avp-vue3"]')
     expect(repository.attributes('target')).toBe('_blank')
     expect(repository.attributes('rel')).toBe('noopener noreferrer')
