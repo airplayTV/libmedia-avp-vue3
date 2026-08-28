@@ -59,12 +59,15 @@ class UiController {
   getStats() {
     this.calls.push(['getStats'])
     return {
-      videoCodec: 'h264',
-      audioCodec: 'aac',
+      videocodec: 'h264 (High)',
+      audiocodec: 'aac (LC)',
       width: 1920,
       height: 1080,
-      fps: 24,
-      bitrate: 4_500_000,
+      videoEncodeFramerate: 25,
+      videoBitrate: 1_748_000,
+      audioBitrate: 63_000,
+      sampleRate: 44_100,
+      channels: 2,
       token: 'must-not-render'
     }
   }
@@ -99,6 +102,9 @@ afterEach(() => {
   delete globalThis.ResizeObserver
   delete navigator.clipboard
   delete document.execCommand
+  delete document.fullscreenElement
+  delete document.exitFullscreen
+  document.body.style.overflow = ''
   document.body.innerHTML = ''
 })
 
@@ -310,8 +316,15 @@ describe('LibmediaPlayer', () => {
 
     const dialog = harness.wrapper.get('.libmedia-diagnostics')
     expect(dialog.attributes('role')).toBe('dialog')
-    expect(dialog.text()).toContain('h264')
+    expect(dialog.text()).toContain('h264 (High)')
+    expect(dialog.text()).toContain('aac (LC)')
     expect(dialog.text()).toContain('1920 × 1080')
+    expect(dialog.text()).toContain('25 fps')
+    expect(dialog.text()).toContain('1.81 Mbps')
+    expect(dialog.text()).toContain('1.75 Mbps')
+    expect(dialog.text()).toContain('63 kbps')
+    expect(dialog.text()).toContain('44.1 kHz')
+    expect(dialog.text()).toContain('2（立体声）')
     expect(dialog.text()).not.toContain('must-not-render')
   })
 
@@ -344,6 +357,9 @@ describe('LibmediaPlayer', () => {
     expect(dialog.get('[role="tab"][aria-selected="true"]').text()).toBe('播放器信息')
     expect(dialog.text()).toContain('libmedia-avp-vue3')
     expect(dialog.text()).toContain('0.1.4')
+    expect(dialog.text()).toContain('AVPlayer / libmedia 版本')
+    expect(dialog.text()).toContain('1.3.1')
+    expect(dialog.findAll('button').map((button) => button.text())).not.toContain('复制')
     const repository = dialog.get('a[href="https://github.com/airplayTV/libmedia-avp-vue3"]')
     expect(repository.attributes('target')).toBe('_blank')
     expect(repository.attributes('rel')).toBe('noopener noreferrer')
@@ -713,14 +729,14 @@ describe('LibmediaPlayer', () => {
     }
   })
 
-  it('hides controls after three idle playing seconds but preserves focused controls', async () => {
+  it('hides controls after five idle playing seconds but preserves keyboard-focused controls', async () => {
     vi.useFakeTimers()
     const harness = mountPlayer()
     await flushPromises()
 
     await harness.wrapper.get('[aria-label="播放"]').trigger('click')
     await flushPromises()
-    await vi.advanceTimersByTimeAsync(2999)
+    await vi.advanceTimersByTimeAsync(4999)
     expect(harness.wrapper.get('.libmedia-player').classes())
       .not.toContain('libmedia-player--controls-hidden')
     await vi.advanceTimersByTimeAsync(1)
@@ -728,10 +744,40 @@ describe('LibmediaPlayer', () => {
       .toContain('libmedia-player--controls-hidden')
 
     await harness.wrapper.get('.libmedia-player').trigger('pointermove')
+    await harness.wrapper.get('.libmedia-player').trigger('keydown', { key: 'Tab' })
     await harness.wrapper.get('[aria-label="暂停"]').trigger('focusin')
-    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(5000)
     expect(harness.wrapper.get('.libmedia-player').classes())
       .not.toContain('libmedia-player--controls-hidden')
+  })
+
+  it('hides controls after repeated surface toggles end in an idle pause', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+
+    for (let index = 0; index < 4; index += 1) {
+      await surface.trigger('pointerdown', { pointerType: 'touch', pointerId: index + 1 })
+      await surface.trigger('click')
+      await flushPromises()
+    }
+
+    expect(harness.wrapper.get('.libmedia-player').attributes('data-state')).toBe('paused')
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .not.toContain('libmedia-player--controls-hidden')
+    await vi.advanceTimersByTimeAsync(1)
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .toContain('libmedia-player--controls-hidden')
+
+    await surface.trigger('pointerdown', { pointerType: 'touch', pointerId: 5 })
+    await surface.trigger('click')
+    await flushPromises()
+
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .not.toContain('libmedia-player--controls-hidden')
+    expect(harness.controller().calls.filter(([name]) => name === 'play')).toHaveLength(2)
   })
 
   it('loads track settings on demand and keeps the panel keyboard accessible', async () => {
@@ -834,5 +880,426 @@ describe('LibmediaPlayer', () => {
     })
     await flushPromises()
     expect(harness.wrapper.find('.custom-error').exists()).toBe(true)
+  })
+
+  it('fullscreens the complete player root and exposes the exit action', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const player = harness.wrapper.get('.libmedia-player').element
+    const requestFullscreen = vi.fn(async () => {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        value: player
+      })
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    Object.defineProperty(player, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen
+    })
+    const exitFullscreen = vi.fn(async () => {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        value: null
+      })
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: exitFullscreen
+    })
+
+    await harness.wrapper.get('[aria-label="进入全屏"]').trigger('click')
+    await flushPromises()
+
+    expect(requestFullscreen).toHaveBeenCalledOnce()
+    expect(harness.controller().calls).not.toContainEqual(['enterFullscreen'])
+    expect(harness.wrapper.get('[aria-label="退出全屏"]').exists()).toBe(true)
+
+    await harness.wrapper.get('[aria-label="退出全屏"]').trigger('click')
+    await flushPromises()
+    expect(exitFullscreen).toHaveBeenCalledOnce()
+  })
+
+  it('synchronizes the action after native fullscreen exits externally', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const player = harness.wrapper.get('.libmedia-player').element
+    const requestFullscreen = vi.fn(async () => {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        value: player
+      })
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    Object.defineProperty(player, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen
+    })
+
+    await harness.wrapper.get('[aria-label="进入全屏"]').trigger('click')
+    await flushPromises()
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null
+    })
+    document.dispatchEvent(new Event('fullscreenchange'))
+    await flushPromises()
+
+    expect(harness.wrapper.find('[aria-label="进入全屏"]').exists()).toBe(true)
+    await harness.wrapper.get('[aria-label="进入全屏"]').trigger('click')
+    await flushPromises()
+    expect(requestFullscreen).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses a reversible viewport fullscreen fallback when element fullscreen is unavailable', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const player = harness.wrapper.get('.libmedia-player')
+    document.body.style.overflow = 'auto'
+
+    await harness.wrapper.get('[aria-label="进入全屏"]').trigger('click')
+    await flushPromises()
+
+    expect(player.classes()).toContain('libmedia-player--pseudo-fullscreen')
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(harness.wrapper.get('[aria-label="退出全屏"]').exists()).toBe(true)
+
+    await harness.wrapper.get('[aria-label="退出全屏"]').trigger('click')
+    await flushPromises()
+    expect(player.classes()).not.toContain('libmedia-player--pseudo-fullscreen')
+    expect(document.body.style.overflow).toBe('auto')
+  })
+
+  it('uses the first tap on a hidden playing surface only to reveal controls', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .toContain('libmedia-player--controls-hidden')
+
+    await surface.trigger('pointerdown', { pointerType: 'touch' })
+    await surface.trigger('click')
+    await flushPromises()
+
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .not.toContain('libmedia-player--controls-hidden')
+    expect(harness.controller().calls.filter(([name]) => name === 'pause')).toHaveLength(0)
+
+    await surface.trigger('pointerdown', { pointerType: 'touch' })
+    await surface.trigger('click')
+    await flushPromises()
+    expect(harness.controller().calls.filter(([name]) => name === 'pause')).toHaveLength(1)
+  })
+
+  it('keeps the first hidden-controls tap reveal-only without Pointer Events', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    await surface.trigger('touchstart')
+    await surface.trigger('click')
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'pause')).toHaveLength(0)
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .not.toContain('libmedia-player--controls-hidden')
+  })
+
+  it('clears a reveal-only gesture when the pointer is cancelled', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    await surface.trigger('pointerdown', { pointerType: 'touch', pointerId: 7 })
+    await surface.trigger('pointercancel', { pointerType: 'touch', pointerId: 7 })
+    await surface.trigger('click')
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'pause')).toHaveLength(1)
+  })
+
+  it('clears a reveal-only gesture when a legacy touch is cancelled', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    await surface.trigger('touchstart')
+    await surface.trigger('touchcancel')
+    await surface.trigger('click')
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'pause')).toHaveLength(1)
+  })
+
+  it('does not let pointer focus permanently pin controls while playback continues', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const playButton = harness.wrapper.get('[aria-label="播放"]')
+
+    await playButton.trigger('pointerdown', { pointerType: 'touch' })
+    await playButton.trigger('focusin')
+    await playButton.trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .toContain('libmedia-player--controls-hidden')
+  })
+
+  it('automatically reloads a playback failure and resumes from the last position', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      controller.emit('statechange', {
+        state: PlayerState.LOADING,
+        previousState: PlayerState.ERROR
+      })
+      controller.emit('loading', { state: PlayerState.LOADING, source })
+      controller.emit('statechange', {
+        state: PlayerState.READY,
+        previousState: PlayerState.LOADING
+      })
+      controller.emit('ready', { duration: 120, state: PlayerState.READY, source })
+    }
+
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_TIMEOUT',
+      message: 'private fragment URL',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    expect(controller.calls).toContainEqual(['load', 'movie.mp4'])
+    expect(controller.calls).toContainEqual(['seek', 42])
+    expect(controller.calls.filter(([name]) => name === 'play').length).toBeGreaterThan(0)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(false)
+  })
+
+  it('does not apply an old recovery position after an imperative source change', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    const oldLoad = Promise.withResolvers()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      if (source === 'movie.mp4') {
+        await oldLoad.promise
+        return
+      }
+      controller.emit('statechange', {
+        state: PlayerState.LOADING,
+        previousState: PlayerState.ERROR
+      })
+      controller.emit('loading', { state: PlayerState.LOADING, source })
+      controller.emit('statechange', {
+        state: PlayerState.READY,
+        previousState: PlayerState.LOADING
+      })
+      controller.emit('ready', { duration: 60, state: PlayerState.READY, source })
+    }
+
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_TIMEOUT',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+    await harness.wrapper.vm.load('next.mp4')
+    oldLoad.resolve()
+    await flushPromises()
+
+    expect(controller.calls).toContainEqual(['load', 'next.mp4'])
+    expect(controller.calls).not.toContainEqual(['seek', 42])
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(0)
+  })
+
+  it('invalidates recovery synchronously when the reactive source changes', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    const oldLoad = Promise.withResolvers()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      if (source === 'movie.mp4') await oldLoad.promise
+    }
+
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_TIMEOUT',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    const sourceUpdate = harness.wrapper.setProps({ src: 'next.mp4' })
+    oldLoad.resolve()
+    await sourceUpdate
+    await flushPromises()
+
+    expect(controller.calls).not.toContainEqual(['seek', 42])
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(0)
+  })
+
+  it('stops automatic recovery after the same failing segment repeats', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      controller.emit('statechange', {
+        state: PlayerState.LOADING,
+        previousState: PlayerState.ERROR
+      })
+      controller.emit('loading', { state: PlayerState.LOADING, source })
+      controller.emit('statechange', {
+        state: PlayerState.READY,
+        previousState: PlayerState.LOADING
+      })
+      controller.emit('ready', { duration: 120, state: PlayerState.READY, source })
+    }
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      harness.emit('statechange', {
+        state: PlayerState.ERROR,
+        previousState: PlayerState.PLAYING
+      })
+      harness.emit('error', {
+        code: 'MEDIA_TIMEOUT',
+        recoverable: true,
+        details: {}
+      })
+      await flushPromises()
+      harness.emit('timeupdate', { currentTime: 42.5, duration: 120 })
+    }
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(2)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(true)
+  })
+
+  it('shows a center replay icon after recovery fails and expires only the safe error notice', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      throw new Error('still unavailable')
+    }
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_LOAD_FAILED',
+      message: 'https://private.example/segment.ts?token=secret',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    expect(harness.wrapper.get('[aria-label="重播"] .libmedia-icon').exists()).toBe(true)
+    const notice = harness.wrapper.get('.libmedia-error-notice')
+    expect(notice.text()).toContain('MEDIA_LOAD_FAILED')
+    expect(notice.text()).not.toContain('private.example')
+    expect(harness.wrapper.find('.libmedia-status-overlay__message').exists()).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(harness.wrapper.find('.libmedia-error-notice').exists()).toBe(false)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(true)
+
+    await harness.wrapper.get('[aria-label="重播"]').trigger('click')
+    await flushPromises()
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(3)
+  })
+
+  it('cancels a pending fullscreen request before it can fall back after unmount', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const request = Promise.withResolvers()
+    const player = harness.wrapper.get('.libmedia-player').element
+    Object.defineProperty(player, 'requestFullscreen', {
+      configurable: true,
+      value: () => request.promise
+    })
+
+    await harness.wrapper.get('[aria-label="进入全屏"]').trigger('click')
+    harness.wrapper.unmount()
+    request.reject(new Error('late rejection'))
+    await flushPromises()
+
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it('lets exit cancel an in-flight fullscreen entry', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const request = Promise.withResolvers()
+    const player = harness.wrapper.get('.libmedia-player').element
+    Object.defineProperty(player, 'requestFullscreen', {
+      configurable: true,
+      value: () => request.promise
+    })
+
+    await harness.wrapper.get('[aria-label="进入全屏"]').trigger('click')
+    await harness.wrapper.get('[aria-label="退出全屏"]').trigger('click')
+    request.reject(new Error('cancelled request'))
+    await flushPromises()
+
+    expect(harness.wrapper.find('[aria-label="进入全屏"]').exists()).toBe(true)
+    expect(harness.wrapper.get('.libmedia-player').classes())
+      .not.toContain('libmedia-player--pseudo-fullscreen')
+    expect(document.body.style.overflow).toBe('')
   })
 })

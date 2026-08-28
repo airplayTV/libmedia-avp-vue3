@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { PlayerState } from '../core/player-state.js'
 import {
+  ExitFullscreenIcon,
   FullscreenIcon,
   MutedIcon,
   PauseIcon,
@@ -10,7 +11,6 @@ import {
   VolumeIcon
 } from './icons.js'
 import PlayerProgress from './PlayerProgress.vue'
-import PlayerSettings from './PlayerSettings.vue'
 import PlayerVolume from './PlayerVolume.vue'
 
 defineOptions({ name: 'PlayerControls' })
@@ -23,17 +23,13 @@ const props = defineProps({
   buffered: { type: Number, default: 0 },
   volume: { type: Number, default: 1 },
   muted: { type: Boolean, default: false },
-  playbackRate: { type: Number, default: 1 },
-  videoTracks: { type: Array, default: () => [] },
-  audioTracks: { type: Array, default: () => [] },
-  subtitleTracks: { type: Array, default: () => [] },
-  settingsOpen: { type: Boolean, default: false }
+  settingsOpen: { type: Boolean, default: false },
+  fullscreen: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
   'toggle-play', 'seek', 'volume', 'toggle-mute', 'fullscreen',
-  'toggle-settings', 'refresh-tracks', 'rate',
-  'select-video', 'select-audio', 'select-subtitle'
+  'toggle-settings'
 ])
 const previewTime = ref(null)
 const playing = computed(() => props.playing)
@@ -107,25 +103,12 @@ function formatTime(value) {
       <button
         type="button"
         class="libmedia-control-button"
-        aria-label="进入全屏"
+        :aria-label="fullscreen ? '退出全屏' : '进入全屏'"
         @click="emit('fullscreen')"
       >
-        <FullscreenIcon />
+        <ExitFullscreenIcon v-if="fullscreen" />
+        <FullscreenIcon v-else />
       </button>
     </div>
-
-    <PlayerSettings
-      :open="settingsOpen"
-      :playback-rate="playbackRate"
-      :video-tracks="videoTracks"
-      :audio-tracks="audioTracks"
-      :subtitle-tracks="subtitleTracks"
-      @close="emit('toggle-settings', false)"
-      @refresh="emit('refresh-tracks')"
-      @rate="emit('rate', $event)"
-      @select-video="emit('select-video', $event)"
-      @select-audio="emit('select-audio', $event)"
-      @select-subtitle="emit('select-subtitle', $event)"
-    />
   </div>
 </template>

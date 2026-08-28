@@ -79,3 +79,110 @@ test('unmounts cleanly without unhandled browser errors', async ({ page }) => {
   await page.waitForTimeout(100)
   await expectNoUnhandledErrors(page, errors)
 })
+
+test('keeps mobile settings and progress inside a short player', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.goto('/')
+  await expectReady(page)
+  const player = page.locator('.libmedia-player')
+  await player.evaluate((element) => {
+    element.style.height = '219px'
+    element.style.minHeight = '0'
+    element.style.aspectRatio = 'auto'
+  })
+  await player.getByRole('button', { name: '播放设置' }).click()
+
+  const geometry = await player.evaluate((element) => {
+    const playerRect = element.getBoundingClientRect()
+    const settings = element.querySelector('.libmedia-settings')
+    const settingsRect = settings.getBoundingClientRect()
+    const headerRect = settings.querySelector('.libmedia-settings__header')
+      .getBoundingClientRect()
+    const progressTrackRect = element.querySelector('.libmedia-progress__track')
+      .getBoundingClientRect()
+    const rowRect = element.querySelector('.libmedia-controls__row')
+      .getBoundingClientRect()
+    return {
+      settingsTop: settingsRect.top,
+      settingsBottom: settingsRect.bottom,
+      settingsWidth: settingsRect.width,
+      settingsHeight: settingsRect.height,
+      playerTop: playerRect.top,
+      playerBottom: playerRect.bottom,
+      headerVisible: headerRect.top >= playerRect.top && headerRect.bottom <= playerRect.bottom,
+      overflowY: getComputedStyle(settings).overflowY,
+      progressGap: rowRect.top - progressTrackRect.bottom
+    }
+  })
+
+  expect(geometry.settingsTop).toBeGreaterThanOrEqual(geometry.playerTop)
+  expect(geometry.settingsBottom).toBeLessThanOrEqual(geometry.playerBottom)
+  expect(geometry.headerVisible).toBe(true)
+  expect(geometry.overflowY).toBe('auto')
+  expect(geometry.settingsWidth).toBeLessThanOrEqual(280)
+  expect(geometry.settingsHeight).toBeLessThanOrEqual(144)
+  expect(geometry.progressGap).toBeGreaterThanOrEqual(0)
+  expect(geometry.progressGap).toBeLessThanOrEqual(2)
+})
+
+test('keeps settings inside a short landscape mobile player', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.goto('/')
+  await expectReady(page)
+  const player = page.locator('.libmedia-player')
+  await player.evaluate((element) => {
+    element.style.height = '219px'
+    element.style.minHeight = '0'
+    element.style.aspectRatio = 'auto'
+  })
+  await player.getByRole('button', { name: '播放设置' }).click()
+
+  const geometry = await player.evaluate((element) => {
+    const playerRect = element.getBoundingClientRect()
+    const settings = element.querySelector('.libmedia-settings')
+    const settingsRect = settings.getBoundingClientRect()
+    return {
+      playerTop: playerRect.top,
+      playerBottom: playerRect.bottom,
+      settingsTop: settingsRect.top,
+      settingsBottom: settingsRect.bottom,
+      overflowY: getComputedStyle(settings).overflowY
+    }
+  })
+
+  expect(geometry.settingsTop).toBeGreaterThanOrEqual(geometry.playerTop + 8)
+  expect(geometry.settingsBottom).toBeLessThanOrEqual(geometry.playerBottom - 64)
+  expect(geometry.overflowY).toBe('auto')
+})
+
+test('keeps rendered video content proportional in wide fullscreen layouts', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 })
+  await page.goto('/')
+  await expectReady(page)
+  await page.getByRole('button', { name: '播放', exact: true }).click()
+  await expect(page.locator('[data-player-state]')).toHaveAttribute(
+    'data-player-state',
+    'playing'
+  )
+  const renderElement = page.locator(
+    '.libmedia-player-core__surface > canvas, .libmedia-player-core__surface > video'
+  ).first()
+  await expect(renderElement).toBeVisible()
+  expect(await renderElement.evaluate((element) => getComputedStyle(element).objectFit))
+    .toBe('contain')
+})
+
+test('toggles fullscreen on the complete player and keeps an exit control', async ({ page }) => {
+  await page.goto('/')
+  await expectReady(page)
+  const player = page.locator('.libmedia-player')
+  await player.getByRole('button', { name: '进入全屏' }).click()
+  await expect(player.getByRole('button', { name: '退出全屏' })).toBeVisible()
+  expect(await player.evaluate((element) => (
+    document.fullscreenElement === element ||
+    element.classList.contains('libmedia-player--pseudo-fullscreen')
+  ))).toBe(true)
+
+  await player.getByRole('button', { name: '退出全屏' }).click()
+  await expect(player.getByRole('button', { name: '进入全屏' })).toBeVisible()
+})

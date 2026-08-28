@@ -14,6 +14,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .libmedia-player {
@@ -32,6 +33,25 @@
   line-height: 1.4;
   outline: none;
   touch-action: manipulation;
+}
+
+.libmedia-player:fullscreen,
+.libmedia-player:-webkit-full-screen,
+.libmedia-player--pseudo-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+  background: #000;
+}
+
+.libmedia-player--pseudo-fullscreen {
+  position: fixed;
+  z-index: 2147483647;
+  inset: 0;
 }
 
 .libmedia-player:focus-visible {
@@ -193,8 +213,8 @@
   position: relative;
   display: flex;
   height: 44px;
-  align-items: center;
-  margin: 0 0 3px;
+  align-items: flex-end;
+  margin: 0 0 1px;
   cursor: pointer;
   touch-action: none;
 }
@@ -252,7 +272,7 @@
 
 .libmedia-progress__tooltip {
   position: absolute;
-  bottom: calc(50% + 11px);
+  bottom: 17px;
   left: clamp(28px, var(--libmedia-progress-hover), calc(100% - 28px));
   z-index: 1;
   min-width: 48px;
@@ -275,11 +295,14 @@
 }
 
 .libmedia-settings {
+  --libmedia-settings-bottom: calc(56px + max(10px, env(safe-area-inset-bottom)));
   position: absolute;
+  z-index: 5;
   right: 14px;
-  bottom: calc(100% - 42px);
+  bottom: var(--libmedia-settings-bottom);
   width: min(320px, calc(100% - 28px));
-  max-height: min(70vh, 420px);
+  max-height: min(420px, calc(100% - var(--libmedia-settings-bottom) - 8px));
+  box-sizing: border-box;
   overflow: auto;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -429,7 +452,68 @@
   background: var(--libmedia-accent);
 }
 
-.libmedia-context-menu-layer,
+.libmedia-status-overlay__center-action {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  color: var(--libmedia-accent);
+  background: rgba(5, 8, 13, 0.76);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.libmedia-status-overlay__center-action:hover {
+  background: rgba(18, 26, 38, 0.9);
+}
+
+.libmedia-status-overlay__center-action:active {
+  transform: scale(0.96);
+}
+
+.libmedia-status-overlay__center-action .libmedia-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.libmedia-error-notice {
+  position: absolute;
+  z-index: 6;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  display: flex;
+  max-width: min(420px, calc(100% - 20px));
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(251, 113, 133, 0.32);
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(24, 8, 12, 0.88);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.libmedia-error-notice strong {
+  font-size: 13px;
+}
+
+.libmedia-error-notice code {
+  color: #fda4af;
+  font-size: 11px;
+}
+
+.libmedia-context-menu-layer {
+  position: absolute;
+  z-index: 7;
+}
+
 .libmedia-diagnostics-backdrop {
   position: absolute;
   z-index: 7;
@@ -437,11 +521,9 @@
 }
 
 .libmedia-context-menu {
-  position: absolute;
-  top: clamp(8px, var(--libmedia-menu-y), calc(100% - 148px));
-  left: clamp(8px, var(--libmedia-menu-x), calc(100% - 184px));
   display: grid;
   width: 176px;
+  box-sizing: border-box;
   padding: 6px;
   border-radius: 10px;
   background: rgba(8, 12, 18, 0.98);
@@ -483,7 +565,8 @@
 .libmedia-diagnostics-backdrop {
   z-index: 8;
   display: grid;
-  align-items: end;
+  align-items: start;
+  justify-items: start;
   padding: 14px;
   background: rgba(0, 0, 0, 0.36);
 }
@@ -493,7 +576,6 @@
   grid-template-rows: auto auto minmax(0, 1fr);
   width: min(560px, 100%);
   max-height: min(72%, 520px);
-  margin-left: auto;
   overflow: hidden;
   border-radius: 12px;
   color: var(--libmedia-text);
@@ -506,8 +588,31 @@
 
 .libmedia-diagnostics__content {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-color: color-mix(in srgb, var(--libmedia-accent) 58%, transparent) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.libmedia-diagnostics__content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.libmedia-diagnostics__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.libmedia-diagnostics__content::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--libmedia-accent) 58%, transparent);
+  background-clip: content-box;
+}
+
+.libmedia-diagnostics__content::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--libmedia-accent) 82%, transparent);
 }
 
 .libmedia-diagnostics__header {
@@ -693,8 +798,36 @@
   }
 
   .libmedia-settings {
+    top: auto;
     right: 8px;
-    width: calc(100% - 16px);
+    bottom: var(--libmedia-settings-bottom);
+    left: auto;
+    width: min(280px, calc(100% - 16px));
+    max-height: min(144px, calc(100% - var(--libmedia-settings-bottom) - 8px));
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+  }
+
+  .libmedia-settings__header {
+    position: sticky;
+    z-index: 1;
+    top: -10px;
+    min-height: 44px;
+    margin: 0 -12px 4px;
+    padding: 0 12px;
+    background: var(--libmedia-surface-strong);
+  }
+
+  .libmedia-settings__field {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .libmedia-settings select {
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
   }
 
   .libmedia-diagnostics-backdrop {
@@ -703,6 +836,10 @@
 
   .libmedia-diagnostics {
     max-height: calc(100% - 16px);
+  }
+
+  .libmedia-diagnostics__content::-webkit-scrollbar {
+    width: 6px;
   }
 
   .libmedia-diagnostics__info {
@@ -723,6 +860,7 @@
   .libmedia-control-button,
   .libmedia-settings button,
   .libmedia-status-overlay__action,
+  .libmedia-status-overlay__center-action,
   .libmedia-progress__track,
   .libmedia-progress__thumb,
   .libmedia-volume__thumb {

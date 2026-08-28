@@ -34,6 +34,21 @@ test('uses a light page hierarchy while keeping the video surface dark', async (
   expect(colors.player.every((channel) => channel <= 5)).toBe(true)
 })
 
+test('uses a light scrollbar that matches the example page', async ({ page }) => {
+  await page.goto('/')
+
+  const scrollbar = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement)
+    return {
+      colorScheme: style.colorScheme,
+      scrollbarColor: style.scrollbarColor
+    }
+  })
+
+  expect(scrollbar.colorScheme).toBe('light')
+  expect(scrollbar.scrollbarColor).toBe('rgb(148, 163, 184) rgb(231, 237, 244)')
+})
+
 test('toggles playback from the video surface and exposes keyboard diagnostics', async ({ page }) => {
   await page.goto('/')
   const state = page.locator('[data-example-state]')
@@ -55,11 +70,18 @@ test('toggles playback from the video surface and exposes keyboard diagnostics',
   const playerBox = await player.boundingBox()
   const playerRight = playerBox.x + playerBox.width
   const playerBottom = playerBox.y + playerBox.height
-  await page.mouse.click(playerRight - 10, playerBox.y + 30, { button: 'right' })
+  const contextPoint = { x: playerBox.x + 240, y: playerBox.y + 120 }
+  await page.mouse.click(contextPoint.x, contextPoint.y, { button: 'right' })
 
+  const menuLayer = player.locator('.libmedia-context-menu-layer')
   const menu = player.locator('.libmedia-context-menu')
   await expect(menu).toBeVisible()
+  const layerBox = await menuLayer.boundingBox()
   const menuBox = await menu.boundingBox()
+  expect(Math.abs(layerBox.x - contextPoint.x)).toBeLessThan(1)
+  expect(Math.abs(layerBox.y - contextPoint.y)).toBeLessThan(1)
+  expect(Math.abs(layerBox.width - menuBox.width)).toBeLessThan(1)
+  expect(Math.abs(layerBox.height - menuBox.height)).toBeLessThan(1)
   expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(playerRight)
   expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(playerBottom)
 
@@ -68,9 +90,13 @@ test('toggles playback from the video surface and exposes keyboard diagnostics',
   await expect(menu).toBeHidden()
   await expect(player).toBeFocused()
 
-  await page.mouse.click(playerRight - 10, playerBox.y + 30, { button: 'right' })
+  const edgePoint = { x: playerRight - 4, y: playerBox.y + 30 }
+  await page.mouse.click(edgePoint.x, edgePoint.y, { button: 'right' })
   await expect(menu).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: '视频信息' })).toBeFocused()
+  const edgeMenuBox = await menu.boundingBox()
+  expect(edgeMenuBox.x + edgeMenuBox.width).toBeLessThanOrEqual(playerRight - 7)
+  expect(edgeMenuBox.y + edgeMenuBox.height).toBeLessThanOrEqual(playerBottom - 7)
   await page.keyboard.press('ArrowDown')
   await expect(menu.getByRole('menuitem', { name: '播放日志' })).toBeFocused()
   await page.keyboard.press('Enter')
@@ -121,6 +147,38 @@ test('coalesces rapid surface clicks and exposes copyable Chinese diagnostics', 
   await expect(dialog).toContainText('开始加载')
   await expect(dialog).toContainText('加载中 → 就绪')
   await expect(dialog).not.toContainText('statechange')
+})
+
+test('shows real AVPlayer media statistics and non-copyable player versions', async ({ page }) => {
+  await page.goto('/')
+  const state = page.locator('[data-example-state]')
+  await expect(state).toHaveText(/ready|playing|ended/)
+
+  const player = page.locator('.libmedia-player')
+  if (await state.textContent() === 'ready') {
+    await player.locator('.libmedia-player-core__surface').click({ position: { x: 180, y: 100 } })
+    await expect(state).toHaveText('playing')
+  }
+  await page.waitForTimeout(1_200)
+  await player.click({ button: 'right', position: { x: 180, y: 100 } })
+  await player.getByRole('menuitem', { name: '视频信息' }).click()
+
+  const dialog = player.getByRole('dialog', { name: '播放诊断' })
+  const infoValue = (label) => dialog.locator(
+    '.libmedia-diagnostics__info > div',
+    { hasText: label }
+  ).locator('dd')
+
+  await expect(infoValue('视频编码')).not.toHaveText('--')
+  await expect(infoValue('音频编码')).not.toHaveText('--')
+  await expect(infoValue('分辨率')).not.toHaveText('--')
+  await expect(infoValue('帧率')).not.toHaveText('--')
+  await expect(infoValue('总码率')).not.toHaveText('--')
+
+  await dialog.getByRole('tab', { name: '播放器信息' }).click()
+  await expect(infoValue('播放器库版本')).toHaveText('0.1.4')
+  await expect(infoValue('AVPlayer / libmedia 版本')).toHaveText('1.3.1')
+  await expect(dialog.getByRole('button', { name: /^复制/ })).toHaveCount(0)
 })
 
 test('renders the aligned rounded progress treatment without a black thumb ring', async ({ page }) => {
@@ -223,16 +281,62 @@ test('keeps long diagnostics content reachable inside a short player', async ({ 
 
   const dialog = player.getByRole('dialog', { name: '播放诊断' })
   const content = dialog.locator('.libmedia-diagnostics__content')
-  const geometry = await content.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    overflowY: getComputedStyle(element).overflowY
-  }))
+  const geometry = await dialog.evaluate((element) => {
+    const dialogRect = element.getBoundingClientRect()
+    const playerRect = element.closest('.libmedia-player').getBoundingClientRect()
+    const contentElement = element.querySelector('.libmedia-diagnostics__content')
+    return {
+      clientHeight: contentElement.clientHeight,
+      scrollHeight: contentElement.scrollHeight,
+      overflowY: getComputedStyle(contentElement).overflowY,
+      offsetTop: dialogRect.top - playerRect.top,
+      offsetLeft: dialogRect.left - playerRect.left
+    }
+  })
 
   expect(geometry.overflowY).toBe('auto')
   expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight)
+  expect(geometry.offsetTop).toBeCloseTo(14, 0)
+  expect(geometry.offsetLeft).toBeCloseTo(14, 0)
   await content.evaluate((element) => { element.scrollTop = element.scrollHeight })
   await expect(dialog.getByText('字幕轨道')).toBeVisible()
+})
+
+test('uses a minimalist diagnostics scrollbar that follows the player theme', async ({ page }) => {
+  await page.goto('/')
+  const player = page.locator('.libmedia-player')
+  await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
+
+  await player.click({ button: 'right', position: { x: 120, y: 80 } })
+  await player.getByRole('menuitem', { name: '视频信息' }).click()
+
+  const content = player.locator('.libmedia-diagnostics__content')
+  const initial = await content.evaluate((element) => {
+    const style = getComputedStyle(element)
+    const thumb = getComputedStyle(element, '::-webkit-scrollbar-thumb')
+    return {
+      width: style.scrollbarWidth,
+      color: style.scrollbarColor,
+      gutter: style.scrollbarGutter,
+      overflowX: style.overflowX,
+      webkitWidth: getComputedStyle(element, '::-webkit-scrollbar').width,
+      thumbColor: thumb.backgroundColor
+    }
+  })
+
+  await player.evaluate((element) => element.style.setProperty('--libmedia-accent', '#ff4d8d'))
+  const themed = await content.evaluate((element) => ({
+    color: getComputedStyle(element).scrollbarColor,
+    thumbColor: getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor
+  }))
+
+  expect(initial.width).toBe('thin')
+  expect(initial.gutter).toBe('stable')
+  expect(initial.overflowX).toBe('hidden')
+  expect(initial.webkitWidth).toBe('8px')
+  expect(initial.color).not.toBe('auto')
+  expect(themed.color).not.toBe(initial.color)
+  expect(themed.thumbColor).not.toBe(initial.thumbColor)
 })
 
 test('keeps every control icon visible while hovered', async ({ page }) => {

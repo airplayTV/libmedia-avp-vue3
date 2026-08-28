@@ -1,8 +1,17 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch
+} from 'vue'
 import LibmediaPlayerCore from './LibmediaPlayerCore.vue'
 import { PlayerState } from '../core/player-state.js'
 import {
+  LIBMEDIA_AVPLAYER_VERSION,
   LIBMEDIA_AVP_NAME,
   LIBMEDIA_AVP_REPOSITORY,
   LIBMEDIA_AVP_VERSION
@@ -10,6 +19,7 @@ import {
 import PlayerControls from '../ui/PlayerControls.vue'
 import PlayerContextMenu from '../ui/PlayerContextMenu.vue'
 import PlayerDiagnostics from '../ui/PlayerDiagnostics.vue'
+import PlayerSettings from '../ui/PlayerSettings.vue'
 import PlayerStatusOverlay from '../ui/PlayerStatusOverlay.vue'
 
 defineOptions({ name: 'LibmediaPlayer' })
@@ -56,21 +66,46 @@ const posterDismissed = ref(false)
 const visualPlaying = ref(false)
 const playbackFeedback = ref(null)
 const streamStalled = ref(false)
+const fullscreenMode = ref(null)
+const fullscreenDesired = ref(false)
+const replayVisible = ref(false)
+const errorNotice = ref(null)
 let hideTimer = null
 let feedbackTimer = null
 let stallTimer = null
+let errorNoticeTimer = null
 let desiredPlaying = false
 let commandedPlaying = false
 let playbackCommandPending = false
+let lastInteractionWasKeyboard = false
+let revealOnlySurfaceClick = false
+let runtimeRecoveryContext = null
+let failedPlaybackContext = null
+let recoveryPromise = null
+let recoverySource = null
+let recoveryEpoch = 0
+let sourceGeneration = 0
+let autoRecoveryBudget = { source: null, time: 0, attempts: 0 }
+let bodyOverflowBeforeFullscreen = null
+let fullscreenEpoch = 0
+let disposed = false
 
 const PLAYBACK_FEEDBACK_DURATION = 600
 const PLAYBACK_STALL_DELAY = 2000
+const CONTROLS_HIDE_DELAY = 5000
+const AUTO_RECOVERY_POSITION_WINDOW = 3
+const AUTO_RECOVERY_RESET_PROGRESS = 5
 
 const surfaceToggleStates = new Set([
   PlayerState.READY,
   PlayerState.PLAYING,
   PlayerState.PAUSED,
   PlayerState.ENDED
+])
+
+const controlsAutoHideStates = new Set([
+  PlayerState.PLAYING,
+  PlayerState.PAUSED
 ])
 const loggedEvents = new Set([
   'loading', 'ready', 'play', 'pause', 'seeking', 'seeked', 'ended',
@@ -122,6 +157,9 @@ const playbackBusy = computed(() => (
   state.value === PlayerState.SEEKING ||
   streamStalled.value
 ))
+const fullscreen = computed(() => (
+  fullscreenMode.value !== null || fullscreenDesired.value
+))
 
 function clearHideTimer() {
   if (hideTimer !== null) {
@@ -135,6 +173,28 @@ function clearFeedbackTimer() {
     clearTimeout(feedbackTimer)
     feedbackTimer = null
   }
+}
+
+function clearErrorNoticeTimer() {
+  if (errorNoticeTimer !== null) {
+    clearTimeout(errorNoticeTimer)
+    errorNoticeTimer = null
+  }
+}
+
+function showErrorNotice(error) {
+  clearErrorNoticeTimer()
+  const code = safeLogCode(error?.code)
+  errorNotice.value = {
+    code: code ?? 'UNSAFE_CODE',
+    message: code
+      ? (diagnosticCodeLabels[code] ?? '播放发生错误')
+      : '播放发生错误'
+  }
+  errorNoticeTimer = setTimeout(() => {
+    errorNotice.value = null
+    errorNoticeTimer = null
+  }, 5000)
 }
 
 function showPlaybackFeedback(feedback) {
@@ -173,14 +233,16 @@ function armStallDetection() {
 function scheduleHide() {
   clearHideTimer()
   if (
-    state.value === PlayerState.PLAYING &&
+    controlsAutoHideStates.has(state.value) &&
     !controlsFocused.value &&
-    !settingsOpen.value
+    !settingsOpen.value &&
+    !contextMenu.value.open &&
+    !diagnosticsOpen.value
   ) {
     hideTimer = setTimeout(() => {
       controlsVisible.value = false
       hideTimer = null
-    }, 3000)
+    }, CONTROLS_HIDE_DELAY)
   }
 }
 
@@ -190,9 +252,10 @@ function showControls() {
 }
 
 function onFocusIn() {
-  controlsFocused.value = true
   controlsVisible.value = true
-  clearHideTimer()
+  controlsFocused.value = lastInteractionWasKeyboard
+  if (controlsFocused.value) clearHideTimer()
+  else scheduleHide()
 }
 
 function onFocusOut(event) {
@@ -201,11 +264,54 @@ function onFocusOut(event) {
   scheduleHide()
 }
 
+function sameSource(left, right) {
+  return Object.is(left, right)
+}
+
+function resetAutoRecoveryBudget(source = null, time = 0) {
+  autoRecoveryBudget = { source, time, attempts: 0 }
+}
+
+function reserveAutoRecovery(context) {
+  if (
+    !sameSource(autoRecoveryBudget.source, context.source) ||
+    Math.abs(autoRecoveryBudget.time - context.time) > AUTO_RECOVERY_POSITION_WINDOW
+  ) {
+    resetAutoRecoveryBudget(context.source, context.time)
+  }
+  if (autoRecoveryBudget.attempts >= 1) return false
+  autoRecoveryBudget.attempts += 1
+  return true
+}
+
+function invalidateRecovery({ clearFailed = true, resetBudget = false } = {}) {
+  recoveryEpoch += 1
+  recoveryPromise = null
+  recoverySource = null
+  runtimeRecoveryContext = null
+  if (clearFailed) {
+    failedPlaybackContext = null
+    replayVisible.value = false
+  }
+  if (resetBudget) resetAutoRecoveryBudget()
+}
+
 function handleEvent(name, payload) {
   appendPlayerLog(name, payload)
   switch (name) {
     case 'loading':
+      {
+        const loadingSource = payload?.source ?? props.src
+        sourceGeneration += 1
+        const isRecoveryLoad = (
+          recoverySource !== null && sameSource(recoverySource, loadingSource)
+        )
+        if (!isRecoveryLoad) {
+          invalidateRecovery({ clearFailed: true, resetBudget: true })
+        }
+      }
       publicError.value = null
+      replayVisible.value = false
       activeSource.value = payload?.source ?? activeSource.value ?? props.src
       if ((payload?.source ?? props.src) !== posterSource.value) {
         posterSource.value = payload?.source ?? props.src
@@ -214,6 +320,18 @@ function handleEvent(name, payload) {
       controlsVisible.value = true
       break
     case 'statechange':
+      if (payload.state === PlayerState.ERROR && [
+        PlayerState.PLAYING,
+        PlayerState.PAUSED,
+        PlayerState.SEEKING
+      ].includes(payload.previousState)) {
+        runtimeRecoveryContext = {
+          source: activeSource.value ?? props.src,
+          time: currentTime.value,
+          resumePlaying: desiredPlaying || payload.previousState === PlayerState.PLAYING
+        }
+        failedPlaybackContext = runtimeRecoveryContext
+      }
       state.value = payload.state
       syncPlaybackState(payload.state)
       if (payload.state === PlayerState.PLAYING) posterDismissed.value = true
@@ -225,7 +343,11 @@ function handleEvent(name, payload) {
       ) {
         publicError.value = null
       }
-      if (state.value === PlayerState.PLAYING) scheduleHide()
+      if (payload.state === PlayerState.PLAYING) {
+        replayVisible.value = false
+        failedPlaybackContext = null
+      }
+      if (controlsAutoHideStates.has(state.value)) scheduleHide()
       else {
         controlsVisible.value = true
         clearHideTimer()
@@ -240,6 +362,13 @@ function handleEvent(name, payload) {
       }
       currentTime.value = payload.currentTime
       duration.value = payload.duration
+      if (
+        autoRecoveryBudget.attempts > 0 &&
+        sameSource(autoRecoveryBudget.source, activeSource.value) &&
+        payload.currentTime >= autoRecoveryBudget.time + AUTO_RECOVERY_RESET_PROGRESS
+      ) {
+        resetAutoRecoveryBudget()
+      }
       break
     case 'durationchange':
     case 'ready':
@@ -252,8 +381,26 @@ function handleEvent(name, payload) {
       break
     case 'error':
       publicError.value = payload
+      showErrorNotice(payload)
       controlsVisible.value = true
       clearHideTimer()
+      if (payload?.code === 'AUTOPLAY_BLOCKED') {
+        replayVisible.value = false
+      } else if (recoveryPromise || recoverySource !== null) {
+        replayVisible.value = false
+      } else if (runtimeRecoveryContext && payload?.recoverable) {
+        const context = runtimeRecoveryContext
+        runtimeRecoveryContext = null
+        if (reserveAutoRecovery(context)) void recoverPlayback(context)
+        else replayVisible.value = true
+      } else {
+        replayVisible.value = true
+        failedPlaybackContext ??= {
+          source: activeSource.value ?? props.src,
+          time: currentTime.value,
+          resumePlaying: true
+        }
+      }
       break
   }
   emit(name, payload)
@@ -372,6 +519,74 @@ function requestPlayback(targetPlaying) {
   void drainPlaybackIntent()
 }
 
+function recoveryIsCurrent(epoch, source) {
+  return (
+    !disposed &&
+    epoch === recoveryEpoch &&
+    sameSource(activeSource.value, source)
+  )
+}
+
+async function restoreFailedPlayback(context, forcePlay, epoch) {
+  const source = context?.source ?? activeSource.value ?? props.src
+  if (!source) {
+    replayVisible.value = true
+    return false
+  }
+
+  replayVisible.value = false
+  try {
+    const generationBeforeLoad = sourceGeneration
+    await coreRef.value?.load(source)
+    if (
+      sourceGeneration !== generationBeforeLoad + 1 ||
+      !recoveryIsCurrent(epoch, source)
+    ) return false
+    if (context?.time > 0) {
+      await coreRef.value?.seek(context.time)
+      if (!recoveryIsCurrent(epoch, source)) return false
+    }
+    if (forcePlay || context?.resumePlaying) {
+      if (!recoveryIsCurrent(epoch, source)) return false
+      desiredPlaying = true
+      visualPlaying.value = true
+      await play()
+      if (!recoveryIsCurrent(epoch, source)) return false
+      commandedPlaying = true
+    }
+    publicError.value = null
+    return true
+  } catch {
+    if (!disposed && epoch === recoveryEpoch) replayVisible.value = true
+    return false
+  }
+}
+
+function recoverPlayback(context, forcePlay = false) {
+  if (recoveryPromise) return recoveryPromise
+  const source = context?.source ?? activeSource.value ?? props.src
+  const epoch = ++recoveryEpoch
+  recoverySource = source
+  const promise = restoreFailedPlayback(context, forcePlay, epoch)
+  recoveryPromise = promise
+  void promise.finally(() => {
+    if (recoveryPromise !== promise) return
+    recoveryPromise = null
+    recoverySource = null
+  })
+  return promise
+}
+
+function replayPlayback() {
+  const context = failedPlaybackContext ?? {
+    source: activeSource.value ?? props.src,
+    time: currentTime.value,
+    resumePlaying: true
+  }
+  failedPlaybackContext = context
+  return recoverPlayback({ ...context, resumePlaying: true }, true)
+}
+
 function togglePlayback() {
   requestPlayback(!desiredPlaying)
 }
@@ -392,17 +607,44 @@ async function closeContextMenu(options = {}) {
 
 function handleSurfaceClick(event) {
   if (!isSurfaceEvent(event) || !surfaceToggleStates.has(state.value)) return
+  if (revealOnlySurfaceClick) {
+    revealOnlySurfaceClick = false
+    return
+  }
   togglePlayback()
+}
+
+function handlePointerActivity() {
+  lastInteractionWasKeyboard = false
+  showControls()
+}
+
+function handlePointerDown(event) {
+  lastInteractionWasKeyboard = false
+  revealOnlySurfaceClick = !controlsVisible.value && isSurfaceEvent(event)
+  showControls()
+}
+
+function handlePointerCancel() {
+  revealOnlySurfaceClick = false
+}
+
+function handleTouchStart(event) {
+  lastInteractionWasKeyboard = false
+  if (!controlsVisible.value && isSurfaceEvent(event)) {
+    revealOnlySurfaceClick = true
+  }
+  showControls()
 }
 
 function handleContextMenu(event) {
   if (!isSurfaceEvent(event)) return
   event.preventDefault()
-  const rect = event.currentTarget.getBoundingClientRect()
+  const playerRect = event.currentTarget.getBoundingClientRect()
   contextMenu.value = {
     open: true,
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
+    x: event.clientX - playerRect.left,
+    y: event.clientY - playerRect.top
   }
   controlsVisible.value = true
   clearHideTimer()
@@ -423,9 +665,41 @@ function closeDiagnostics() {
   scheduleHide()
 }
 
-function statValue(stats, key) {
-  const value = stats?.[key]
-  return typeof value === 'string' || typeof value === 'number' ? value : '--'
+function statValue(stats, ...keys) {
+  for (const key of keys) {
+    const value = stats?.[key]
+    if (typeof value === 'string' && value.trim()) return value
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return '--'
+}
+
+function positiveStat(stats, ...keys) {
+  const value = statValue(stats, ...keys)
+  return typeof value === 'number' && value > 0 ? value : null
+}
+
+function trimFixed(value, digits = 2) {
+  return Number(value.toFixed(digits)).toString()
+}
+
+function formatBitrate(value) {
+  if (!Number.isFinite(value) || value <= 0) return '--'
+  if (value >= 1_000_000) return `${trimFixed(value / 1_000_000)} Mbps`
+  if (value >= 1_000) return `${trimFixed(value / 1_000)} kbps`
+  return `${Math.round(value)} bps`
+}
+
+function formatSampleRate(value) {
+  if (!Number.isFinite(value) || value <= 0) return '--'
+  return value >= 1_000 ? `${trimFixed(value / 1_000)} kHz` : `${Math.round(value)} Hz`
+}
+
+function formatChannels(value) {
+  if (!Number.isFinite(value) || value <= 0) return '--'
+  if (value === 1) return '1（单声道）'
+  if (value === 2) return '2（立体声）'
+  return `${value}`
 }
 
 function sourceType(source) {
@@ -477,7 +751,18 @@ function buildVideoInfo(core) {
   const width = statValue(stats, 'width')
   const height = statValue(stats, 'height')
   const resolution = width !== '--' && height !== '--' ? `${width} × ${height}` : '--'
-  const bitrate = statValue(stats, 'bitrate')
+  const videoBitrate = positiveStat(stats, 'videoBitrate')
+  const audioBitrate = positiveStat(stats, 'audioBitrate')
+  const totalBitrate = videoBitrate || audioBitrate
+    ? (videoBitrate ?? 0) + (audioBitrate ?? 0)
+    : positiveStat(stats, 'bitrate')
+  const frameRate = positiveStat(
+    stats,
+    'videoEncodeFramerate',
+    'videoRenderFramerate',
+    'videoDecodeFramerate',
+    'fps'
+  )
   const source = sourceDetails(activeSource.value)
 
   return [
@@ -493,11 +778,15 @@ function buildVideoInfo(core) {
     { label: '播放位置', value: `${formatDiagnosticTime(currentTime.value)} / ${formatDiagnosticTime(duration.value)}` },
     { label: '播放速度', value: `${core.playbackRate}×` },
     { label: '音量', value: muted.value ? '静音' : `${Math.round(volume.value * 100)}%` },
-    { label: '视频编码', value: statValue(stats, 'videoCodec') },
-    { label: '音频编码', value: statValue(stats, 'audioCodec') },
+    { label: '视频编码', value: statValue(stats, 'videocodec', 'videoCodec') },
+    { label: '音频编码', value: statValue(stats, 'audiocodec', 'audioCodec') },
     { label: '分辨率', value: resolution },
-    { label: '帧率', value: statValue(stats, 'fps') },
-    { label: '码率', value: bitrate === '--' ? '--' : `${bitrate} bps` },
+    { label: '帧率', value: frameRate ? `${trimFixed(frameRate)} fps` : '--' },
+    { label: '总码率', value: formatBitrate(totalBitrate) },
+    { label: '视频码率', value: formatBitrate(videoBitrate) },
+    { label: '音频码率', value: formatBitrate(audioBitrate) },
+    { label: '音频采样率', value: formatSampleRate(positiveStat(stats, 'sampleRate')) },
+    { label: '音频声道', value: formatChannels(positiveStat(stats, 'channels')) },
     { label: '视频轨道', value: core.videoTracks.length },
     { label: '音频轨道', value: core.audioTracks.length },
     { label: '字幕轨道', value: core.subtitleTracks.length }
@@ -507,14 +796,12 @@ function buildVideoInfo(core) {
 function buildPlayerInfo() {
   return [
     { label: '播放器库', value: LIBMEDIA_AVP_NAME },
-    { label: '版本号', value: LIBMEDIA_AVP_VERSION },
+    { label: '播放器库版本', value: LIBMEDIA_AVP_VERSION },
+    { label: 'AVPlayer / libmedia 版本', value: LIBMEDIA_AVPLAYER_VERSION },
     {
       label: 'GitHub 地址',
       value: LIBMEDIA_AVP_REPOSITORY,
-      href: LIBMEDIA_AVP_REPOSITORY,
-      copyable: true,
-      copyValue: LIBMEDIA_AVP_REPOSITORY,
-      copyLabel: '复制 GitHub 地址'
+      href: LIBMEDIA_AVP_REPOSITORY
     }
   ]
 }
@@ -550,6 +837,11 @@ watch(() => props.controls, (enabled) => {
   clearHideTimer()
 })
 
+watch(() => props.src, (source, previousSource) => {
+  if (sameSource(source, previousSource)) return
+  invalidateRecovery({ clearFailed: true, resetBudget: true })
+}, { flush: 'sync' })
+
 function refreshTracks(core) {
   run(Promise.all([
     core.getVideoList(),
@@ -558,8 +850,93 @@ function refreshTracks(core) {
   ]))
 }
 
+function playerElement() {
+  return coreRef.value?.$el ?? null
+}
+
+function nativeFullscreenElement() {
+  return document.fullscreenElement ?? document.webkitFullscreenElement ?? null
+}
+
+function restorePageOverflow() {
+  if (bodyOverflowBeforeFullscreen === null) return
+  document.body.style.overflow = bodyOverflowBeforeFullscreen
+  bodyOverflowBeforeFullscreen = null
+}
+
+function enterPseudoFullscreen() {
+  if (disposed || !fullscreenDesired.value) return
+  if (bodyOverflowBeforeFullscreen === null) {
+    bodyOverflowBeforeFullscreen = document.body.style.overflow
+  }
+  document.body.style.overflow = 'hidden'
+  fullscreenMode.value = 'pseudo'
+}
+
+async function exitNativeFullscreen(player = playerElement()) {
+  const exit = document.exitFullscreen ?? document.webkitExitFullscreen
+  if (typeof exit !== 'function' || nativeFullscreenElement() !== player) return
+  try {
+    await exit.call(document)
+  } catch {}
+}
+
+function syncFullscreenState() {
+  if (disposed) return
+  const active = nativeFullscreenElement()
+  const player = playerElement()
+  if (active === player) {
+    if (fullscreenDesired.value) fullscreenMode.value = 'native'
+    else void exitNativeFullscreen(player)
+  } else if (fullscreenMode.value === 'native') {
+    fullscreenDesired.value = false
+    fullscreenEpoch += 1
+    fullscreenMode.value = null
+  }
+}
+
+async function enterCompleteFullscreen() {
+  const player = playerElement()
+  if (!player || disposed || fullscreenDesired.value) return
+  fullscreenDesired.value = true
+  const epoch = ++fullscreenEpoch
+  const request = player.requestFullscreen ?? player.webkitRequestFullscreen
+  if (typeof request === 'function') {
+    try {
+      await request.call(player)
+      if (disposed || epoch !== fullscreenEpoch || !fullscreenDesired.value) {
+        await exitNativeFullscreen(player)
+        return
+      }
+      fullscreenMode.value = 'native'
+      return
+    } catch {
+      // iOS/WebView implementations may expose but reject element fullscreen.
+    }
+  }
+  if (disposed || epoch !== fullscreenEpoch || !fullscreenDesired.value) return
+  enterPseudoFullscreen()
+}
+
+async function exitCompleteFullscreen() {
+  fullscreenDesired.value = false
+  fullscreenEpoch += 1
+  if (fullscreenMode.value === 'pseudo') {
+    fullscreenMode.value = null
+    restorePageOverflow()
+    return
+  }
+  await exitNativeFullscreen()
+  fullscreenMode.value = null
+}
+
+function toggleFullscreen() {
+  return fullscreen.value ? exitCompleteFullscreen() : enterCompleteFullscreen()
+}
+
 function handleKeydown(event) {
   if (!props.controls) return
+  lastInteractionWasKeyboard = true
   const target = event.target
   const editing = target instanceof Element && target.closest(
     'button, input, select, textarea, [contenteditable="true"]'
@@ -577,10 +954,10 @@ function handleKeydown(event) {
     arrowup: () => setVolume(volume.value + 0.05),
     arrowdown: () => setVolume(volume.value - 0.05),
     m: toggleMute,
-    f: () => run(coreRef.value?.enterFullscreen()),
+    f: () => run(toggleFullscreen()),
     escape: () => {
       if (settingsOpen.value) setSettingsOpen(false)
-      else run(coreRef.value?.exitFullscreen())
+      else run(exitCompleteFullscreen())
     }
   }
   const action = actions[key]
@@ -590,15 +967,18 @@ function handleKeydown(event) {
   action()
 }
 
-const load = (source = props.src) => coreRef.value?.load(source)
+const load = (source = props.src) => {
+  invalidateRecovery({ clearFailed: true, resetBudget: true })
+  return coreRef.value?.load(source)
+}
 const pause = () => coreRef.value?.pause()
 const stop = () => coreRef.value?.stop()
 const seek = (seconds) => coreRef.value?.seek(seconds)
 const setPublicVolume = (value) => coreRef.value?.setVolume(value)
 const mute = () => coreRef.value?.mute()
 const unmute = () => coreRef.value?.unmute()
-const enterFullscreen = () => coreRef.value?.enterFullscreen()
-const exitFullscreen = () => coreRef.value?.exitFullscreen()
+const enterFullscreen = () => enterCompleteFullscreen()
+const exitFullscreen = () => exitCompleteFullscreen()
 const getStats = () => coreRef.value?.getStats() ?? null
 
 defineExpose({
@@ -615,10 +995,25 @@ defineExpose({
   getStats
 })
 
+onMounted(() => {
+  disposed = false
+  document.addEventListener('fullscreenchange', syncFullscreenState)
+  document.addEventListener('webkitfullscreenchange', syncFullscreenState)
+})
+
 onBeforeUnmount(() => {
+  disposed = true
+  fullscreenDesired.value = false
+  fullscreenEpoch += 1
+  invalidateRecovery({ clearFailed: true })
   clearHideTimer()
   clearFeedbackTimer()
   clearStallTimer()
+  clearErrorNoticeTimer()
+  document.removeEventListener('fullscreenchange', syncFullscreenState)
+  document.removeEventListener('webkitfullscreenchange', syncFullscreenState)
+  if (fullscreenMode.value === 'pseudo') restorePageOverflow()
+  else void exitNativeFullscreen()
 })
 </script>
 
@@ -629,7 +1024,9 @@ onBeforeUnmount(() => {
     class="libmedia-player"
     :class="{
       'libmedia-player--controls-hidden': controls && !controlsVisible,
-      'libmedia-player--settings-open': settingsOpen
+      'libmedia-player--settings-open': settingsOpen,
+      'libmedia-player--fullscreen': fullscreenMode === 'native',
+      'libmedia-player--pseudo-fullscreen': fullscreenMode === 'pseudo'
     }"
     :style="themeStyle"
     :src="src"
@@ -660,9 +1057,11 @@ onBeforeUnmount(() => {
     @click="handleSurfaceClick"
     @contextmenu="handleContextMenu"
     @keydown="handleKeydown"
-    @pointermove="showControls"
-    @pointerdown="showControls"
-    @touchstart.passive="showControls"
+    @pointermove="handlePointerActivity"
+    @pointerdown="handlePointerDown"
+    @pointercancel="handlePointerCancel"
+    @touchstart.passive="handleTouchStart"
+    @touchcancel.passive="handlePointerCancel"
     @focusin="onFocusIn"
     @focusout="onFocusOut"
     @mouseleave="scheduleHide"
@@ -673,7 +1072,8 @@ onBeforeUnmount(() => {
       :poster="posterDismissed ? '' : poster"
       :busy="playbackBusy"
       :feedback="controls ? playbackFeedback : null"
-      @retry="run(core.load(src))"
+      :replay="replayVisible"
+      @replay="run(replayPlayback())"
       @play="requestPlayback(true)"
     >
       <template v-if="$slots.loading" #loading="slotProps">
@@ -684,6 +1084,16 @@ onBeforeUnmount(() => {
       </template>
     </PlayerStatusOverlay>
 
+    <div
+      v-if="errorNotice"
+      class="libmedia-error-notice"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>{{ errorNotice.message }}</strong>
+      <code>{{ errorNotice.code }}</code>
+    </div>
+
     <PlayerControls
       v-if="controls"
       :state="state"
@@ -693,27 +1103,34 @@ onBeforeUnmount(() => {
       :buffered="core.currentTime"
       :volume="core.volume"
       :muted="core.muted"
-      :playback-rate="core.playbackRate"
-      :video-tracks="core.videoTracks"
-      :audio-tracks="core.audioTracks"
-      :subtitle-tracks="core.subtitleTracks"
       :settings-open="settingsOpen"
+      :fullscreen="fullscreen"
       @toggle-play="togglePlayback"
       @seek="seekTo"
       @volume="setVolume"
       @toggle-mute="toggleMute"
-      @fullscreen="run(core.enterFullscreen())"
+      @fullscreen="run(toggleFullscreen())"
       @toggle-settings="setSettingsOpen"
-      @refresh-tracks="refreshTracks(core)"
-      @rate="run(core.setPlaybackRate($event))"
-      @select-video="run(core.selectVideo($event, true))"
-      @select-audio="run(core.selectAudio($event, true))"
-      @select-subtitle="run(core.selectSubtitle($event))"
     >
       <template #extra>
         <slot name="controls-extra" :state="state" />
       </template>
     </PlayerControls>
+
+    <PlayerSettings
+      v-if="controls"
+      :open="settingsOpen"
+      :playback-rate="core.playbackRate"
+      :video-tracks="core.videoTracks"
+      :audio-tracks="core.audioTracks"
+      :subtitle-tracks="core.subtitleTracks"
+      @close="setSettingsOpen(false)"
+      @refresh="refreshTracks(core)"
+      @rate="run(core.setPlaybackRate($event))"
+      @select-video="run(core.selectVideo($event, true))"
+      @select-audio="run(core.selectAudio($event, true))"
+      @select-subtitle="run(core.selectSubtitle($event))"
+    />
 
     <PlayerContextMenu
       :open="contextMenu.open"

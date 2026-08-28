@@ -51,6 +51,12 @@ export const FullscreenIcon = createIcon('LibmediaFullscreenIcon', [
   { d: 'M21 16v5h-5' },
   { d: 'M3 16v5h5' }
 ])
+export const ExitFullscreenIcon = createIcon('LibmediaExitFullscreenIcon', [
+  { d: 'M8 3v5H3' },
+  { d: 'M16 3v5h5' },
+  { d: 'M21 16h-5v5' },
+  { d: 'M3 16h5v5' }
+])
 export const RetryIcon = createIcon('LibmediaRetryIcon', [
   { d: 'M20 11a8 8 0 1 0-2.34 5.66' },
   { d: 'M20 4v7h-7' }

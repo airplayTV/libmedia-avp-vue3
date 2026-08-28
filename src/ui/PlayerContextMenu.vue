@@ -10,7 +10,23 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'select'])
+const layerRef = ref(null)
 const menuRef = ref(null)
+const positionStyle = ref({ left: '8px', top: '8px' })
+
+function clamp(value, minimum, maximum) {
+  return Math.min(Math.max(minimum, value), Math.max(minimum, maximum))
+}
+
+function updatePosition() {
+  const layer = layerRef.value
+  const parent = layer?.offsetParent
+  if (!layer || !parent) return
+  positionStyle.value = {
+    left: `${clamp(props.x, 8, parent.clientWidth - layer.offsetWidth - 8)}px`,
+    top: `${clamp(props.y, 8, parent.clientHeight - layer.offsetHeight - 8)}px`
+  }
+}
 
 function focusItem(index) {
   const items = [...(menuRef.value?.querySelectorAll('[role="menuitem"]') ?? [])]
@@ -42,11 +58,12 @@ function handleDocumentPointerDown(event) {
   if (props.open && !menuRef.value?.contains(event.target)) emit('close')
 }
 
-watch(() => props.open, async (open) => {
+watch([() => props.open, () => props.x, () => props.y], async ([open]) => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   if (!open) return
   document.addEventListener('pointerdown', handleDocumentPointerDown, true)
   await nextTick()
+  updatePosition()
   focusItem(0)
 })
 
@@ -58,8 +75,9 @@ onBeforeUnmount(() => {
 <template>
   <div
     v-if="open"
+    ref="layerRef"
     class="libmedia-context-menu-layer"
-    @click.stop="emit('close')"
+    :style="positionStyle"
     @contextmenu.prevent.stop
   >
     <div
@@ -67,10 +85,6 @@ onBeforeUnmount(() => {
       class="libmedia-context-menu"
       role="menu"
       aria-label="播放器菜单"
-      :style="{
-        '--libmedia-menu-x': `${x}px`,
-        '--libmedia-menu-y': `${y}px`
-      }"
       @click.stop
       @keydown.stop="handleKeydown"
     >
