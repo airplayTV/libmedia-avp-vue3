@@ -80,6 +80,9 @@ onBeforeUnmount(() => {
       <button type="button" role="menuitem" @click="emit('select', 'logs')">
         播放日志
       </button>
+      <button type="button" role="menuitem" @click="emit('select', 'player')">
+        播放器信息
+      </button>
     </div>
   </div>
 </template>

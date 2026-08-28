@@ -7,6 +7,7 @@ const props = defineProps({
   open: { type: Boolean, default: false },
   tab: { type: String, default: 'info' },
   info: { type: Array, default: () => [] },
+  playerInfo: { type: Array, default: () => [] },
   logs: { type: Array, default: () => [] }
 })
 
@@ -47,7 +48,14 @@ function handleKeydown(event) {
 function handleTabKeydown(event) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
-  const nextTab = ['ArrowRight', 'End'].includes(event.key) ? 'logs' : 'info'
+  const tabs = ['info', 'logs', 'player']
+  const current = Math.max(0, tabs.indexOf(props.tab))
+  const nextTab = {
+    ArrowLeft: tabs[(current - 1 + tabs.length) % tabs.length],
+    ArrowRight: tabs[(current + 1) % tabs.length],
+    Home: tabs[0],
+    End: tabs.at(-1)
+  }[event.key]
   emit('tab', nextTab)
   nextTick(() => {
     dialogRef.value
@@ -154,57 +162,74 @@ onBeforeUnmount(() => clearTimeout(copyFeedbackTimer))
         >
           播放日志
         </button>
+        <button
+          type="button"
+          role="tab"
+          data-tab="player"
+          :aria-selected="tab === 'player'"
+          :tabindex="tab === 'player' ? 0 : -1"
+          @click="emit('tab', 'player')"
+          @keydown="handleTabKeydown"
+        >
+          播放器信息
+        </button>
       </div>
 
-      <dl v-if="tab === 'info'" class="libmedia-diagnostics__info" role="tabpanel">
-        <div
-          v-for="item in info"
-          :key="item.label"
-          :class="{ 'libmedia-diagnostics__info-item--copyable': item.copyable }"
+      <div class="libmedia-diagnostics__content">
+        <dl
+          v-if="tab === 'info' || tab === 'player'"
+          class="libmedia-diagnostics__info"
+          role="tabpanel"
         >
-          <dt>{{ item.label }}</dt>
-          <dd>
-            <a
-              v-if="item.href"
-              :href="item.href"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {{ item.value }}
-            </a>
-            <span v-else>{{ item.value }}</span>
-            <button
-              v-if="item.copyable"
-              type="button"
-              :aria-label="item.copyLabel ?? '复制当前文件或 URL'"
-              @click="copyInfo(item)"
-            >
-              {{ copiedLabel === item.label ? '已复制' : '复制' }}
-            </button>
-          </dd>
-          <span
-            v-if="copyErrorLabel === item.label"
-            class="libmedia-diagnostics__copy-error"
+          <div
+            v-for="item in tab === 'player' ? playerInfo : info"
+            :key="item.label"
+            :class="{ 'libmedia-diagnostics__info-item--copyable': item.copyable }"
           >
-            复制失败，请手动选择
-          </span>
-        </div>
-      </dl>
+            <dt>{{ item.label }}</dt>
+            <dd>
+              <a
+                v-if="item.href"
+                :href="item.href"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ item.value }}
+              </a>
+              <span v-else>{{ item.value }}</span>
+              <button
+                v-if="item.copyable"
+                type="button"
+                :aria-label="item.copyLabel ?? '复制当前文件或 URL'"
+                @click="copyInfo(item)"
+              >
+                {{ copiedLabel === item.label ? '已复制' : '复制' }}
+              </button>
+            </dd>
+            <span
+              v-if="copyErrorLabel === item.label"
+              class="libmedia-diagnostics__copy-error"
+            >
+              复制失败，请手动选择
+            </span>
+          </div>
+        </dl>
 
-      <ol v-else class="libmedia-diagnostics__logs" role="tabpanel" aria-label="安全播放日志">
-        <li v-if="logs.length === 0" class="libmedia-diagnostics__empty">
-          暂无播放日志
-        </li>
-        <li
-          v-for="(entry, index) in logs"
-          :key="`${entry.time}-${index}`"
-          class="libmedia-diagnostics__log-item"
-        >
-          <time>{{ entry.time }}</time>
-          <strong>{{ entry.event }}</strong>
-          <span v-if="entry.summary">{{ entry.summary }}</span>
-        </li>
-      </ol>
+        <ol v-else class="libmedia-diagnostics__logs" role="tabpanel" aria-label="安全播放日志">
+          <li v-if="logs.length === 0" class="libmedia-diagnostics__empty">
+            暂无播放日志
+          </li>
+          <li
+            v-for="(entry, index) in logs"
+            :key="`${entry.time}-${index}`"
+            class="libmedia-diagnostics__log-item"
+          >
+            <time>{{ entry.time }}</time>
+            <strong>{{ entry.event }}</strong>
+            <span v-if="entry.summary">{{ entry.summary }}</span>
+          </li>
+        </ol>
+      </div>
 
       <span class="libmedia-visually-hidden" role="status" aria-live="polite">
         {{ copyStatus }}

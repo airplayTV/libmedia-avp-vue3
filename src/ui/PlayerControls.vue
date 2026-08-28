@@ -11,6 +11,7 @@ import {
 } from './icons.js'
 import PlayerProgress from './PlayerProgress.vue'
 import PlayerSettings from './PlayerSettings.vue'
+import PlayerVolume from './PlayerVolume.vue'
 
 defineOptions({ name: 'PlayerControls' })
 
@@ -88,16 +89,10 @@ function formatTime(value) {
         <MutedIcon v-if="muted" />
         <VolumeIcon v-else />
       </button>
-      <input
-        class="libmedia-controls__volume"
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
+      <PlayerVolume
         :value="muted ? 0 : volume"
-        aria-label="音量"
-        @input="emit('volume', Number($event.target.value))"
-      >
+        @change="emit('volume', $event)"
+      />
 
       <button
         type="button"

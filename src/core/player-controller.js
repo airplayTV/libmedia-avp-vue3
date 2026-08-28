@@ -428,8 +428,10 @@ export class PlayerController {
         }
         break
       case 'seeking':
-        this.#stateBeforeSeek = this.#state
-        if (this.#transition(PlayerState.SEEKING)) {
+        {
+          const stateBeforeSeek = this.#state
+          if (!this.#transition(PlayerState.SEEKING)) break
+          this.#stateBeforeSeek = stateBeforeSeek
           this.#emit('seeking', { state: this.#state })
         }
         break

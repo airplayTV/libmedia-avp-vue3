@@ -130,6 +130,20 @@ describe('player controller', () => {
     expect(engine.calls.filter(([name]) => name === 'play')).toHaveLength(1)
   })
 
+  it('restores the pre-seek state after duplicate seeking events', async () => {
+    const harness = createHarness()
+    await harness.controller.load('movie.mp4')
+    await harness.controller.play()
+
+    harness.engine.emit('seeking')
+    harness.engine.emit('seeking')
+    harness.engine.emit('seeked')
+
+    expect(harness.controller.state).toBe(PlayerState.PLAYING)
+    expect(harness.events.filter(([name]) => name === 'seeking')).toHaveLength(1)
+    expect(harness.events.filter(([name]) => name === 'seeked')).toHaveLength(1)
+  })
+
   it('stops the previous source and discards retained events from its epoch', async () => {
     const harness = createHarness()
     await harness.controller.load('a.mp4')

@@ -303,7 +303,7 @@ describe('LibmediaPlayer', () => {
     })
     const menu = harness.wrapper.get('.libmedia-context-menu')
     expect(menu.attributes('role')).toBe('menu')
-    expect(menu.findAll('[role="menuitem"]')).toHaveLength(2)
+    expect(menu.findAll('[role="menuitem"]')).toHaveLength(3)
 
     await menu.findAll('[role="menuitem"]')[0].trigger('click')
     await flushPromises()
@@ -315,7 +315,7 @@ describe('LibmediaPlayer', () => {
     expect(dialog.text()).not.toContain('must-not-render')
   })
 
-  it('shows library name, version, and a safe repository link in video information', async () => {
+  it('separates library details from video information', async () => {
     const harness = mountPlayer()
     await flushPromises()
 
@@ -323,12 +323,27 @@ describe('LibmediaPlayer', () => {
       clientX: 120,
       clientY: 80
     })
-    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    const menuItems = harness.wrapper.get('.libmedia-context-menu').findAll('[role="menuitem"]')
+    await menuItems[0].trigger('click')
     await flushPromises()
 
-    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    let dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.text()).not.toContain('libmedia-avp-vue3')
+    expect(dialog.text()).not.toContain('GitHub 地址')
+
+    await dialog.get('[aria-label="关闭播放诊断"]').trigger('click')
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu').findAll('[role="menuitem"]')[2]
+      .trigger('click')
+    await flushPromises()
+
+    dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.get('[role="tab"][aria-selected="true"]').text()).toBe('播放器信息')
     expect(dialog.text()).toContain('libmedia-avp-vue3')
-    expect(dialog.text()).toContain('0.1.2')
+    expect(dialog.text()).toContain('0.1.3')
     const repository = dialog.get('a[href="https://github.com/airplayTV/libmedia-avp-vue3"]')
     expect(repository.attributes('target')).toBe('_blank')
     expect(repository.attributes('rel')).toBe('noopener noreferrer')
@@ -378,6 +393,22 @@ describe('LibmediaPlayer', () => {
     const dialog = harness.wrapper.get('.libmedia-diagnostics')
     expect(dialog.text()).toContain(actualSource)
     expect(dialog.text()).not.toContain('https://media.example/a.mp4')
+  })
+
+  it('keeps the active source visible during transient loading events', async () => {
+    const source = 'https://media.example/movie.mp4?token=active'
+    const harness = mountPlayer({ props: { src: source } })
+    await flushPromises()
+
+    harness.emit('loading', { state: PlayerState.LOADING, source })
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    expect(harness.wrapper.get('.libmedia-diagnostics').text()).toContain(source)
   })
 
   it('shows local file metadata after imperative loading', async () => {
@@ -730,6 +761,19 @@ describe('LibmediaPlayer', () => {
       ['setVolume', 0.25],
       ['mute']
     ]))
+  })
+
+  it('keeps volume slider keyboard input out of playback seek shortcuts', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    await harness.wrapper.get('[role="slider"][aria-label="音量"]')
+      .trigger('keydown', { key: 'ArrowRight' })
+    await flushPromises()
+
+    const calls = harness.controller().calls
+    expect(calls).toContainEqual(['setVolume', 1])
+    expect(calls.filter(([name]) => name === 'seek')).toHaveLength(0)
   })
 
   it('renders only stable error information and gives autoplay blocking a play action', async () => {

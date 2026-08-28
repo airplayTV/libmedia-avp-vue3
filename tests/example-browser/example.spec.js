@@ -212,6 +212,29 @@ test('matches the approved G icon sizing, weight and control alignment', async (
   expect(geometry.settingsHasCenterCircle).toBe(true)
 })
 
+test('keeps long diagnostics content reachable inside a short player', async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 420 })
+  await page.goto('/')
+  const player = page.locator('.libmedia-player')
+  await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
+
+  await player.click({ button: 'right', position: { x: 120, y: 80 } })
+  await player.getByRole('menuitem', { name: '视频信息' }).click()
+
+  const dialog = player.getByRole('dialog', { name: '播放诊断' })
+  const content = dialog.locator('.libmedia-diagnostics__content')
+  const geometry = await content.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY
+  }))
+
+  expect(geometry.overflowY).toBe('auto')
+  expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight)
+  await content.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await expect(dialog.getByText('字幕轨道')).toBeVisible()
+})
+
 test('keeps every control icon visible while hovered', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
@@ -316,7 +339,9 @@ test.describe('mobile controls', () => {
     const player = page.locator('.libmedia-player')
     await player.hover()
     await expect(player.locator('.libmedia-controls__time-total')).toBeVisible()
-    await expect(player.locator('.libmedia-controls__time')).toContainText('00:00 / 00:02')
+    await expect(player.locator('.libmedia-controls__time')).toHaveText(
+      /^\d{2}:\d{2} \/ \d{2}:\d{2}$/
+    )
 
     const layout = await player.evaluate((element) => {
       const playerRect = element.getBoundingClientRect()

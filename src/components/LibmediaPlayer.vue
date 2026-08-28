@@ -206,7 +206,7 @@ function handleEvent(name, payload) {
   switch (name) {
     case 'loading':
       publicError.value = null
-      activeSource.value = null
+      activeSource.value = payload?.source ?? activeSource.value ?? props.src
       if ((payload?.source ?? props.src) !== posterSource.value) {
         posterSource.value = payload?.source ?? props.src
         posterDismissed.value = false
@@ -481,16 +481,6 @@ function buildVideoInfo(core) {
   const source = sourceDetails(activeSource.value)
 
   return [
-    { label: '播放器库', value: LIBMEDIA_AVP_NAME },
-    { label: '版本号', value: LIBMEDIA_AVP_VERSION },
-    {
-      label: 'GitHub 地址',
-      value: LIBMEDIA_AVP_REPOSITORY,
-      href: LIBMEDIA_AVP_REPOSITORY,
-      copyable: true,
-      copyValue: LIBMEDIA_AVP_REPOSITORY,
-      copyLabel: '复制 GitHub 地址'
-    },
     {
       label: '当前文件 / URL',
       value: source.display,
@@ -511,6 +501,21 @@ function buildVideoInfo(core) {
     { label: '视频轨道', value: core.videoTracks.length },
     { label: '音频轨道', value: core.audioTracks.length },
     { label: '字幕轨道', value: core.subtitleTracks.length }
+  ]
+}
+
+function buildPlayerInfo() {
+  return [
+    { label: '播放器库', value: LIBMEDIA_AVP_NAME },
+    { label: '版本号', value: LIBMEDIA_AVP_VERSION },
+    {
+      label: 'GitHub 地址',
+      value: LIBMEDIA_AVP_REPOSITORY,
+      href: LIBMEDIA_AVP_REPOSITORY,
+      copyable: true,
+      copyValue: LIBMEDIA_AVP_REPOSITORY,
+      copyLabel: '复制 GitHub 地址'
+    }
   ]
 }
 
@@ -722,6 +727,7 @@ onBeforeUnmount(() => {
       :open="diagnosticsOpen"
       :tab="diagnosticsTab"
       :info="buildVideoInfo(core)"
+      :player-info="buildPlayerInfo()"
       :logs="playerLogs"
       @close="closeDiagnostics"
       @tab="diagnosticsTab = $event"

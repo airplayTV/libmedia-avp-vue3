@@ -16,10 +16,4 @@ describe('player visual contract', () => {
   it('keeps the video surface square while allowing overlays to use their own radius', () => {
     expect(declarationBlock('.libmedia-player')).toMatch(/border-radius:\s*0\s*;/)
   })
-
-  it('renders the volume range without a native border', () => {
-    const volume = declarationBlock('.libmedia-controls__volume')
-    expect(volume).toMatch(/border:\s*0\s*;/)
-    expect(volume).toMatch(/background:\s*transparent\s*;/)
-  })
 })

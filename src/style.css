@@ -108,7 +108,8 @@
 .libmedia-player button:focus-visible,
 .libmedia-player input:focus-visible,
 .libmedia-player select:focus-visible,
-.libmedia-progress:focus-visible {
+.libmedia-progress:focus-visible,
+.libmedia-controls__volume:focus-visible {
   outline: 2px solid var(--libmedia-focus);
   outline-offset: 2px;
 }
@@ -148,12 +149,44 @@
 }
 
 .libmedia-controls__volume {
+  position: relative;
+  display: flex;
   width: 86px;
-  min-height: 44px;
-  border: 0;
-  background: transparent;
-  accent-color: var(--libmedia-accent);
+  height: 44px;
+  flex: 0 0 86px;
+  align-items: center;
   cursor: pointer;
+  touch-action: none;
+}
+
+.libmedia-volume__track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.libmedia-volume__played {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--libmedia-volume-value);
+  border-radius: inherit;
+  background: var(--libmedia-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--libmedia-accent) 58%, transparent);
+}
+
+.libmedia-volume__thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--libmedia-volume-value);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--libmedia-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--libmedia-accent) 20%, transparent);
+  transform: translate(-50%, -50%);
 }
 
 .libmedia-progress {
@@ -405,7 +438,7 @@
 
 .libmedia-context-menu {
   position: absolute;
-  top: clamp(8px, var(--libmedia-menu-y), calc(100% - 104px));
+  top: clamp(8px, var(--libmedia-menu-y), calc(100% - 148px));
   left: clamp(8px, var(--libmedia-menu-x), calc(100% - 184px));
   display: grid;
   width: 176px;
@@ -457,6 +490,7 @@
 
 .libmedia-diagnostics {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   width: min(560px, 100%);
   max-height: min(72%, 520px);
   margin-left: auto;
@@ -468,6 +502,12 @@
     0 0 0 1px rgba(255, 255, 255, 0.1),
     0 20px 64px rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(18px);
+}
+
+.libmedia-diagnostics__content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .libmedia-diagnostics__header {
@@ -522,7 +562,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
-  overflow: auto;
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -596,7 +635,6 @@
 .libmedia-diagnostics__logs {
   min-height: 140px;
   margin: 0;
-  overflow: auto;
   padding: 4px 0 10px;
   list-style: none;
 }
@@ -686,7 +724,8 @@
   .libmedia-settings button,
   .libmedia-status-overlay__action,
   .libmedia-progress__track,
-  .libmedia-progress__thumb {
+  .libmedia-progress__thumb,
+  .libmedia-volume__thumb {
     transition: none;
   }
 
