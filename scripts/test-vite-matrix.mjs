@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -28,7 +28,10 @@ function run(command, args, options = {}) {
 }
 
 const projectRoot = resolve(import.meta.dirname, '..')
-const temporaryRoot = await mkdtemp(join(tmpdir(), 'libmedia-avp-matrix-'))
+const temporaryRoot = await mkdtemp(join(
+  await realpath(tmpdir()),
+  'libmedia-avp-matrix-'
+))
 
 try {
   run('npm', ['run', 'build:lib'], { cwd: projectRoot })
