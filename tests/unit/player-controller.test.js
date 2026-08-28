@@ -47,7 +47,7 @@ describe('player controller', () => {
     expect(harness.controller.state).toBe(PlayerState.PLAYING)
     expect(harness.events).toContainEqual([
       'ready',
-      { duration: 120, state: PlayerState.READY }
+      { duration: 120, state: PlayerState.READY, source: 'a.mp4' }
     ])
     expect(harness.events).toContainEqual([
       'timeupdate',

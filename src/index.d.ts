@@ -51,6 +51,7 @@ export interface LibmediaPlayerProps {
   poster?: string
   controls?: boolean
   playsinline?: boolean
+  themeColor?: string
   assetBaseUrl?: string
   wasmVariant?: WasmVariant
   loadOptions?: Record<string, unknown>

@@ -1,18 +1,30 @@
 <script setup>
 import { computed } from 'vue'
 import { PlayerState } from '../core/player-state.js'
-import { PlayIcon, RetryIcon } from './icons.js'
+import { PauseIcon, PlayIcon, RetryIcon } from './icons.js'
 
 defineOptions({ name: 'PlayerStatusOverlay' })
 
 const props = defineProps({
   state: { type: String, required: true },
   error: { type: Object, default: null },
-  poster: { type: String, default: '' }
+  poster: { type: String, default: '' },
+  busy: { type: Boolean, default: false },
+  feedback: { type: String, default: null }
 })
 const emit = defineEmits(['retry', 'play'])
-const loading = computed(() => props.state === PlayerState.LOADING)
+const loading = computed(() => (
+  props.busy ||
+  props.state === PlayerState.LOADING ||
+  props.state === PlayerState.SEEKING
+))
 const autoplayBlocked = computed(() => props.error?.code === 'AUTOPLAY_BLOCKED')
+const activeFeedback = computed(() => loading.value ? 'loading' : props.feedback)
+const feedbackLabel = computed(() => ({
+  play: '已暂停',
+  pause: '正在播放',
+  loading: '正在加载'
+})[activeFeedback.value] ?? '')
 </script>
 
 <template>
@@ -46,11 +58,29 @@ const autoplayBlocked = computed(() => props.error?.code === 'AUTOPLAY_BLOCKED')
       </slot>
     </div>
 
-    <div v-else-if="loading" class="libmedia-status-overlay__message" aria-live="polite">
-      <slot name="loading" :state="state">
-        <span class="libmedia-status-overlay__spinner" aria-hidden="true" />
-        <span>正在准备播放</span>
-      </slot>
+    <div
+      v-else-if="loading && $slots.loading"
+      class="libmedia-status-overlay__message"
+      aria-live="polite"
+    >
+      <slot name="loading" :state="state" />
+    </div>
+
+    <div
+      v-else-if="activeFeedback"
+      class="libmedia-playback-feedback"
+      :data-feedback="activeFeedback"
+      role="status"
+      :aria-label="feedbackLabel"
+    >
+      <span
+        v-if="activeFeedback === 'loading'"
+        class="libmedia-status-overlay__spinner"
+        aria-hidden="true"
+      />
+      <PlayIcon v-else-if="activeFeedback === 'play'" />
+      <PauseIcon v-else />
+      <span class="libmedia-visually-hidden">{{ feedbackLabel }}</span>
     </div>
   </div>
 </template>

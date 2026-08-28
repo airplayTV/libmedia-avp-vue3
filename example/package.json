@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/report-build.mjs"
   },
   "dependencies": {
+    "gsap": "^3.15.0",
     "libmedia-avp-vue3": "file:..",
     "vue": "^3.5.18"
   },

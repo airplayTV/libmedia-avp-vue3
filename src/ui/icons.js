@@ -1,31 +1,36 @@
 import { h } from 'vue'
 
-function createIcon(name, paths) {
+function createIcon(name, nodes, options = {}) {
+  const solid = options.solid === true
+
   return {
     name,
     setup() {
       return () => h('svg', {
-        class: 'libmedia-icon',
+        class: ['libmedia-icon', solid ? 'libmedia-icon--solid' : 'libmedia-icon--outline'],
         viewBox: '0 0 24 24',
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-width': 2,
+        fill: solid ? 'currentColor' : 'none',
+        stroke: solid ? 'none' : 'currentColor',
+        'stroke-width': solid ? undefined : 1.8,
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
         'aria-hidden': 'true',
         focusable: 'false'
-      }, paths.map((attributes) => h('path', attributes)))
+      }, nodes.map((node) => {
+        const { tag = 'path', ...attributes } = node
+        return h(tag, attributes)
+      }))
     }
   }
 }
 
 export const PlayIcon = createIcon('LibmediaPlayIcon', [
-  { d: 'm8 5 11 7-11 7Z' }
-])
+  { d: 'M8 5v14l11-7z' }
+], { solid: true })
 export const PauseIcon = createIcon('LibmediaPauseIcon', [
-  { d: 'M9 5v14' },
-  { d: 'M15 5v14' }
-])
+  { tag: 'rect', x: 7, y: 5, width: 4, height: 14, rx: 1 },
+  { tag: 'rect', x: 13, y: 5, width: 4, height: 14, rx: 1 }
+], { solid: true })
 export const VolumeIcon = createIcon('LibmediaVolumeIcon', [
   { d: 'M11 5 6 9H3v6h3l5 4Z' },
   { d: 'M15 9.5a4 4 0 0 1 0 5' },
@@ -37,8 +42,8 @@ export const MutedIcon = createIcon('LibmediaMutedIcon', [
   { d: 'm21 10-5 5' }
 ])
 export const SettingsIcon = createIcon('LibmediaSettingsIcon', [
-  { d: 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z' },
-  { d: 'M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1.55 1H9.55a1.7 1.7 0 0 0-1.55-1 1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 3.6 15a1.7 1.7 0 0 0-1-1.55v-3.9A1.7 1.7 0 0 0 3.6 8a1.7 1.7 0 0 0-.34-1.88l-.06-.06L6.06 3.2l.06.06A1.7 1.7 0 0 0 8 3.6a1.7 1.7 0 0 0 1.55-1h3.9A1.7 1.7 0 0 0 15 3.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 8a1.7 1.7 0 0 0 1 1.55v3.9a1.7 1.7 0 0 0-1 1.55Z' }
+  { tag: 'circle', cx: 12, cy: 12, r: 3 },
+  { d: 'M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a8 8 0 0 0-1.8-1L14.4 3H9.6l-.3 3a8 8 0 0 0-1.8 1l-2.4-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a8 8 0 0 0 1.8 1l.3 3h4.8l.3-3a8 8 0 0 0 1.8-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1Z' }
 ])
 export const FullscreenIcon = createIcon('LibmediaFullscreenIcon', [
   { d: 'M8 3H3v5' },
@@ -50,4 +55,3 @@ export const RetryIcon = createIcon('LibmediaRetryIcon', [
   { d: 'M20 11a8 8 0 1 0-2.34 5.66' },
   { d: 'M20 4v7h-7' }
 ])
-

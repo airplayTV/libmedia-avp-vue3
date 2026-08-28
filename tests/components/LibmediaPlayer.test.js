@@ -17,7 +17,7 @@ class UiController {
     this.emit('loading', { state: PlayerState.LOADING })
     this.emit('durationchange', { duration: 120 })
     this.emit('statechange', { state: PlayerState.READY, previousState: PlayerState.LOADING })
-    this.emit('ready', { duration: 120, state: PlayerState.READY })
+    this.emit('ready', { duration: 120, state: PlayerState.READY, source })
   }
 
   async play(options) {
@@ -56,7 +56,18 @@ class UiController {
   async resize(width, height) { this.calls.push(['resize', width, height]) }
   async enterFullscreen() { this.calls.push(['enterFullscreen']) }
   async exitFullscreen() { this.calls.push(['exitFullscreen']) }
-  getStats() { return { videoCodec: 'h264' } }
+  getStats() {
+    this.calls.push(['getStats'])
+    return {
+      videoCodec: 'h264',
+      audioCodec: 'aac',
+      width: 1920,
+      height: 1080,
+      fps: 24,
+      bitrate: 4_500_000,
+      token: 'must-not-render'
+    }
+  }
   async destroy() { this.calls.push(['destroy']) }
 }
 
@@ -86,9 +97,509 @@ function mountPlayer(options = {}) {
 afterEach(() => {
   vi.useRealTimers()
   delete globalThis.ResizeObserver
+  delete navigator.clipboard
+  delete document.execCommand
+  document.body.innerHTML = ''
 })
 
 describe('LibmediaPlayer', () => {
+  it('toggles playback when the video surface is clicked', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await flushPromises()
+    expect(harness.controller().calls.filter(([name]) => name === 'play')).toHaveLength(1)
+
+    await surface.trigger('click')
+    await flushPromises()
+    expect(harness.controller().calls.filter(([name]) => name === 'pause')).toHaveLength(1)
+  })
+
+  it('updates the bottom control and central feedback before play is confirmed', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    const playGate = Promise.withResolvers()
+    const controller = harness.controller()
+    controller.play = async (options) => {
+      controller.calls.push(['play', options])
+      await playGate.promise
+      controller.emit('statechange', {
+        state: PlayerState.PLAYING,
+        previousState: PlayerState.READY
+      })
+      controller.emit('play', { state: PlayerState.PLAYING })
+    }
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('click')
+
+    expect(harness.wrapper.get('.libmedia-control-button--primary').attributes('aria-label'))
+      .toBe('暂停')
+    expect(harness.wrapper.get('.libmedia-playback-feedback').attributes('data-feedback'))
+      .toBe('pause')
+
+    await vi.advanceTimersByTimeAsync(600)
+    expect(harness.wrapper.find('.libmedia-playback-feedback').exists()).toBe(false)
+
+    playGate.resolve()
+    await flushPromises()
+  })
+
+  it('shows central play feedback immediately when pausing from the surface', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('click')
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('click')
+
+    expect(harness.wrapper.get('.libmedia-control-button--primary').attributes('aria-label'))
+      .toBe('播放')
+    expect(harness.wrapper.get('.libmedia-playback-feedback').attributes('data-feedback'))
+      .toBe('play')
+  })
+
+  it('shows a loading icon when playback stops progressing and clears it on progress', async () => {
+    vi.useFakeTimers()
+    const harness = mountPlayer()
+    await flushPromises()
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('click')
+    await flushPromises()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(harness.wrapper.get('.libmedia-playback-feedback').attributes('data-feedback'))
+      .toBe('loading')
+
+    harness.emit('timeupdate', { currentTime: 1, duration: 120 })
+    await flushPromises()
+
+    expect(harness.wrapper.find('[data-feedback="loading"]').exists()).toBe(false)
+  })
+
+  it('coalesces a rapid double click to one play followed by one pause', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const playGate = Promise.withResolvers()
+    const controller = harness.controller()
+    controller.play = async (options) => {
+      controller.calls.push(['play', options])
+      await playGate.promise
+      controller.emit('statechange', {
+        state: PlayerState.PLAYING,
+        previousState: PlayerState.READY
+      })
+      controller.emit('play', { state: PlayerState.PLAYING })
+    }
+
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await surface.trigger('click')
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+
+    playGate.resolve()
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+    expect(controller.calls.filter(([name]) => name === 'pause')).toHaveLength(1)
+    expect(harness.wrapper.get('.libmedia-player').attributes('data-state')).toBe('paused')
+  })
+
+  it('coalesces a rapid triple click to a single play command', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const playGate = Promise.withResolvers()
+    const controller = harness.controller()
+    controller.play = async (options) => {
+      controller.calls.push(['play', options])
+      await playGate.promise
+      controller.emit('statechange', {
+        state: PlayerState.PLAYING,
+        previousState: PlayerState.READY
+      })
+      controller.emit('play', { state: PlayerState.PLAYING })
+    }
+
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await surface.trigger('click')
+    await surface.trigger('click')
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+
+    playGate.resolve()
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+    expect(controller.calls.filter(([name]) => name === 'pause')).toHaveLength(0)
+    expect(harness.wrapper.get('.libmedia-player').attributes('data-state')).toBe('playing')
+  })
+
+  it('does not add built-in surface interactions when controls are disabled', async () => {
+    const harness = mountPlayer({ props: { controls: false } })
+    await flushPromises()
+
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await surface.trigger('contextmenu', { clientX: 80, clientY: 60 })
+    await harness.wrapper.get('.libmedia-player').trigger('keydown', { key: 'k' })
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'play')).toHaveLength(0)
+    expect(harness.wrapper.find('.libmedia-context-menu').exists()).toBe(false)
+  })
+
+  it('reads engine statistics only while the diagnostics panel is open', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'getStats')).toHaveLength(0)
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'getStats').length).toBeGreaterThan(0)
+  })
+
+  it('opens video information from the surface context menu without exposing raw stats', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    const menu = harness.wrapper.get('.libmedia-context-menu')
+    expect(menu.attributes('role')).toBe('menu')
+    expect(menu.findAll('[role="menuitem"]')).toHaveLength(2)
+
+    await menu.findAll('[role="menuitem"]')[0].trigger('click')
+    await flushPromises()
+
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.attributes('role')).toBe('dialog')
+    expect(dialog.text()).toContain('h264')
+    expect(dialog.text()).toContain('1920 × 1080')
+    expect(dialog.text()).not.toContain('must-not-render')
+  })
+
+  it('shows and copies the complete active URL without masking query parameters', async () => {
+    const source = 'https://media.example/video.mp4?token=secret&sign=abc123'
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    })
+    const harness = mountPlayer({ props: { src: source } })
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.text()).toContain(source)
+    await dialog.get('[aria-label="复制当前文件或 URL"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledWith(source)
+    expect(dialog.text()).toContain('已复制')
+    expect(dialog.get('[role="status"]').text()).toContain('当前文件或 URL 已复制')
+  })
+
+  it('shows the source passed to imperative load instead of the stale src prop', async () => {
+    const harness = mountPlayer({ props: { src: 'https://media.example/a.mp4' } })
+    await flushPromises()
+    const actualSource = 'https://media.example/b.mp4?token=actual'
+
+    await harness.wrapper.vm.load(actualSource)
+    await flushPromises()
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.text()).toContain(actualSource)
+    expect(dialog.text()).not.toContain('https://media.example/a.mp4')
+  })
+
+  it('shows local file metadata after imperative loading', async () => {
+    const harness = mountPlayer({ props: { src: 'https://media.example/a.mp4' } })
+    await flushPromises()
+    const file = new File(['video-data'], '本地视频.mp4', { type: 'video/mp4' })
+
+    await harness.wrapper.vm.load(file)
+    await flushPromises()
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    expect(dialog.text()).toContain('本地视频.mp4')
+    expect(dialog.text()).toContain('10 B')
+    expect(dialog.text()).toContain('video/mp4')
+  })
+
+  it('falls back to compatibility copying when Clipboard API rejects', async () => {
+    const source = 'https://media.example/video.mp4?token=secret'
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }
+    })
+    const execCommand = vi.fn().mockReturnValue(true)
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand
+    })
+    const harness = mountPlayer({ props: { src: source } })
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    await dialog.get('[aria-label="复制当前文件或 URL"]').trigger('click')
+    await flushPromises()
+
+    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(dialog.text()).toContain('已复制')
+    expect(dialog.text()).not.toContain('复制失败')
+  })
+
+  it('shows manual-copy feedback when compatibility copying returns false', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: undefined
+    })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(false)
+    })
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+
+    await dialog.get('[aria-label="复制当前文件或 URL"]').trigger('click')
+    await flushPromises()
+
+    expect(dialog.text()).toContain('复制失败，请手动选择')
+  })
+
+  it('cleans up and reports failure when compatibility copying throws', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: undefined
+    })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn(() => { throw new Error('blocked') })
+    })
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+
+    await dialog.get('[aria-label="复制当前文件或 URL"]').trigger('click')
+    await flushPromises()
+
+    expect(dialog.text()).toContain('复制失败，请手动选择')
+    expect(document.body.querySelector('textarea')).toBeNull()
+  })
+
+  it('coalesces repeated autoplay recovery clicks and clears the error after playing', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const playGate = Promise.withResolvers()
+    const controller = harness.controller()
+    controller.play = async (options) => {
+      controller.calls.push(['play', options])
+      await playGate.promise
+      controller.emit('statechange', {
+        state: PlayerState.PLAYING,
+        previousState: PlayerState.READY
+      })
+      controller.emit('play', { state: PlayerState.PLAYING })
+    }
+    harness.emit('error', {
+      code: 'AUTOPLAY_BLOCKED',
+      message: 'Interaction required',
+      recoverable: true,
+      requiresUserGesture: true,
+      details: {}
+    })
+    await flushPromises()
+
+    const action = harness.wrapper.get('[aria-label="开始播放"]')
+    await action.trigger('click')
+    await action.trigger('click')
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+
+    playGate.resolve()
+    await flushPromises()
+
+    expect(harness.wrapper.find('[aria-label="开始播放"]').exists()).toBe(false)
+  })
+
+  it('closes built-in overlays when controls become disabled at runtime', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+    expect(harness.wrapper.find('.libmedia-diagnostics').exists()).toBe(true)
+
+    await harness.wrapper.setProps({ controls: false })
+    await flushPromises()
+
+    expect(harness.wrapper.find('.libmedia-diagnostics').exists()).toBe(false)
+    expect(harness.wrapper.find('.libmedia-context-menu').exists()).toBe(false)
+    expect(harness.wrapper.find('.libmedia-settings').exists()).toBe(false)
+  })
+
+  it('renders player events and state transitions in clear Chinese', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 100,
+      clientY: 70
+    })
+    const menuItems = harness.wrapper.get('.libmedia-context-menu').findAll('[role="menuitem"]')
+    await menuItems[1].trigger('click')
+    await flushPromises()
+
+    const logs = harness.wrapper.get('.libmedia-diagnostics__logs')
+    expect(logs.text()).toContain('开始加载')
+    expect(logs.text()).toContain('加载完成')
+    expect(logs.text()).toContain('空闲 → 加载中')
+    expect(logs.text()).toContain('加载中 → 就绪')
+    expect(logs.text()).not.toContain('statechange')
+  })
+
+  it('keeps at most 100 safe player log entries', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    for (let index = 0; index < 105; index += 1) {
+      harness.emit('diagnostic', {
+        code: index === 104
+          ? 'https://private.example/video.m3u8?token=must-not-render'
+          : `DIAGNOSTIC_${index}`,
+        message: 'https://private.example/video.m3u8?token=must-not-render'
+      })
+    }
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 100,
+      clientY: 70
+    })
+    const menuItems = harness.wrapper.get('.libmedia-context-menu').findAll('[role="menuitem"]')
+    await menuItems[1].trigger('click')
+    await flushPromises()
+
+    const entries = harness.wrapper.findAll('.libmedia-diagnostics__log-item')
+    expect(entries).toHaveLength(100)
+    expect(entries.at(-1).text()).toContain('诊断代码格式异常')
+    expect(harness.wrapper.get('.libmedia-diagnostics').text()).not.toContain('private.example')
+    expect(harness.wrapper.get('.libmedia-diagnostics').text()).not.toContain('must-not-render')
+  })
+
+  it('keeps keyboard focus inside the diagnostics dialog', async () => {
+    const harness = mountPlayer()
+    document.body.appendChild(harness.wrapper.element)
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('contextmenu', {
+      clientX: 120,
+      clientY: 80
+    })
+    await harness.wrapper.get('.libmedia-context-menu [role="menuitem"]').trigger('click')
+    await flushPromises()
+
+    const dialog = harness.wrapper.get('.libmedia-diagnostics')
+    const focusable = dialog.findAll('button')
+    focusable.at(-1).element.focus()
+    await dialog.trigger('keydown', { key: 'Tab' })
+    expect(document.activeElement).toBe(focusable[0].element)
+
+    focusable[0].element.focus()
+    await dialog.trigger('keydown', { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(focusable.at(-1).element)
+  })
+
+  it('renders both play states as solid glyphs', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    const playIcon = harness.wrapper.get('.libmedia-control-button--primary .libmedia-icon')
+    expect(playIcon.classes()).toContain('libmedia-icon--solid')
+    expect(playIcon.attributes('fill')).toBe('currentColor')
+    expect(playIcon.attributes('stroke')).toBe('none')
+
+    await harness.wrapper.get('.libmedia-control-button--primary').trigger('click')
+    await flushPromises()
+
+    const pauseIcon = harness.wrapper.get('.libmedia-control-button--primary .libmedia-icon')
+    expect(pauseIcon.classes()).toContain('libmedia-icon--solid')
+    expect(pauseIcon.attributes('fill')).toBe('currentColor')
+    expect(pauseIcon.attributes('stroke')).toBe('none')
+  })
+
+  it('formats short and long playback times with two-digit leading fields', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    harness.emit('timeupdate', { currentTime: 369, duration: 5265 })
+    await flushPromises()
+
+    expect(harness.wrapper.get('.libmedia-controls__time').text())
+      .toBe('06:09 / 01:27:45')
+  })
+
+  it('maps the reactive themeColor prop to the public accent variable', async () => {
+    const harness = mountPlayer({ props: { themeColor: '#38bdf8' } })
+    await flushPromises()
+
+    expect(harness.wrapper.get('.libmedia-player').attributes('style'))
+      .toContain('--libmedia-accent: #38bdf8')
+
+    await harness.wrapper.setProps({ themeColor: '#22c55e' })
+
+    expect(harness.wrapper.get('.libmedia-player').attributes('style'))
+      .toContain('--libmedia-accent: #22c55e')
+  })
+
   it('uses native controls and scopes keyboard shortcuts to the player root', async () => {
     const harness = mountPlayer()
     await flushPromises()

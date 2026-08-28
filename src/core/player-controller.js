@@ -116,7 +116,7 @@ export class PlayerController {
       epoch,
       run: async () => {
         if (this.#transition(PlayerState.LOADING)) {
-          this.#emit('loading', { state: this.#state })
+          this.#emit('loading', { state: this.#state, source: this.#source })
         }
 
         const engine = await this.#runWithRetry(
@@ -403,7 +403,7 @@ export class PlayerController {
     switch (name) {
       case 'loading':
         if (this.#transition(PlayerState.LOADING)) {
-          this.#emit('loading', { state: this.#state })
+          this.#emit('loading', { state: this.#state, source: this.#source })
         }
         break
       case 'loaded':
@@ -473,7 +473,7 @@ export class PlayerController {
     if (!this.#transition(PlayerState.READY)) return
     const duration = this.#getDuration()
     this.#emit('durationchange', { duration })
-    this.#emit('ready', { duration, state: this.#state })
+    this.#emit('ready', { duration, state: this.#state, source: this.#source })
   }
 
   #getDuration() {

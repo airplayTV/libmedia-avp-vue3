@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { gsap } from 'gsap'
 import { LibmediaPlayer } from 'libmedia-avp-vue3'
 
 const sources = Object.freeze({
@@ -13,6 +14,9 @@ const state = ref('idle')
 const currentTime = ref(0)
 const duration = ref(0)
 const error = ref(null)
+const themeColor = ref('#22c55e')
+const cursorAura = ref(null)
+let cursorMedia = null
 
 const progress = computed(() => {
   if (!duration.value) return '0%'
@@ -52,9 +56,86 @@ function handleReady(payload) {
 function handleError(payload) {
   error.value = payload
 }
+
+onMounted(() => {
+  cursorMedia = gsap.matchMedia()
+  cursorMedia.add({
+    finePointer: '(pointer: fine)',
+    reduceMotion: '(prefers-reduced-motion: reduce)'
+  }, (context) => {
+    const aura = cursorAura.value
+    const { finePointer, reduceMotion } = context.conditions
+    if (!aura || !finePointer || reduceMotion) return
+
+    gsap.set(aura, { xPercent: -50, yPercent: -50, opacity: 0, scale: 1 })
+    const xTo = gsap.quickTo(aura, 'x', { duration: 0.24, ease: 'power3.out' })
+    const yTo = gsap.quickTo(aura, 'y', { duration: 0.24, ease: 'power3.out' })
+    const interactiveElements = [...document.querySelectorAll(
+      'button, a, input, .file-action'
+    )].filter((element) => !element.closest('.libmedia-player'))
+
+    const moveAura = (event) => {
+      xTo(event.clientX)
+      yTo(event.clientY)
+      const isOverPlayer = event.target instanceof Element
+        && Boolean(event.target.closest('.libmedia-player'))
+      gsap.to(aura, {
+        opacity: isOverPlayer ? 0 : 0.46,
+        duration: isOverPlayer ? 0.12 : 0.18,
+        overwrite: 'auto'
+      })
+    }
+    const hideAura = () => {
+      gsap.to(aura, { opacity: 0, duration: 0.2, overwrite: 'auto' })
+    }
+    const tightenAura = () => {
+      gsap.to(aura, {
+        scale: 0.72,
+        opacity: 0.68,
+        duration: 0.24,
+        ease: 'power2.out',
+        overwrite: 'auto'
+      })
+    }
+    const releaseAura = () => {
+      gsap.to(aura, {
+        scale: 1,
+        opacity: 0.46,
+        duration: 0.28,
+        ease: 'power2.out',
+        overwrite: 'auto'
+      })
+    }
+
+    window.addEventListener('pointermove', moveAura, { passive: true })
+    document.documentElement.addEventListener('mouseleave', hideAura)
+    for (const element of interactiveElements) {
+      element.addEventListener('pointerenter', tightenAura)
+      element.addEventListener('pointerleave', releaseAura)
+    }
+
+    return () => {
+      window.removeEventListener('pointermove', moveAura)
+      document.documentElement.removeEventListener('mouseleave', hideAura)
+      for (const element of interactiveElements) {
+        element.removeEventListener('pointerenter', tightenAura)
+        element.removeEventListener('pointerleave', releaseAura)
+      }
+      xTo.tween.kill()
+      yTo.tween.kill()
+      gsap.killTweensOf(aura)
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  cursorMedia?.revert()
+  cursorMedia = null
+})
 </script>
 
 <template>
+  <div ref="cursorAura" class="cursor-aura" aria-hidden="true" />
   <main class="example-shell">
     <header class="masthead">
       <div>
@@ -72,6 +153,7 @@ function handleError(payload) {
     <section class="player-frame" aria-label="视频播放器演示">
       <LibmediaPlayer
         :src="source"
+        :theme-color="themeColor"
         wasm-variant="baseline"
         controls
         playsinline
@@ -108,6 +190,10 @@ function handleError(payload) {
               accept="video/*,.m3u8,.ts"
               @change="loadLocalFile"
             >
+          </label>
+          <label class="theme-action">
+            <span>主题色</span>
+            <input v-model="themeColor" type="color" aria-label="播放器主题色">
           </label>
         </div>
       </div>

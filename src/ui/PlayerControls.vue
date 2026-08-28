@@ -16,6 +16,7 @@ defineOptions({ name: 'PlayerControls' })
 
 const props = defineProps({
   state: { type: String, required: true },
+  playing: { type: Boolean, default: false },
   currentTime: { type: Number, default: 0 },
   duration: { type: Number, default: 0 },
   buffered: { type: Number, default: 0 },
@@ -34,16 +35,18 @@ const emit = defineEmits([
   'select-video', 'select-audio', 'select-subtitle'
 ])
 const previewTime = ref(null)
-const playing = computed(() => props.state === PlayerState.PLAYING)
+const playing = computed(() => props.playing)
 
 function formatTime(value) {
   const seconds = Math.max(0, Math.floor(value || 0))
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor(seconds % 3600 / 60)
   const remainder = seconds % 60
+  const paddedMinutes = String(minutes).padStart(2, '0')
+  const paddedSeconds = String(remainder).padStart(2, '0')
   return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
-    : `${minutes}:${String(remainder).padStart(2, '0')}`
+    ? `${String(hours).padStart(2, '0')}:${paddedMinutes}:${paddedSeconds}`
+    : `${paddedMinutes}:${paddedSeconds}`
 }
 </script>
 
@@ -60,7 +63,7 @@ function formatTime(value) {
     <div class="libmedia-controls__row">
       <button
         type="button"
-        class="libmedia-control-button"
+        class="libmedia-control-button libmedia-control-button--primary"
         :aria-label="playing ? '暂停' : '播放'"
         @click="emit('toggle-play')"
       >
@@ -131,4 +134,3 @@ function formatTime(value) {
     />
   </div>
 </template>
-
