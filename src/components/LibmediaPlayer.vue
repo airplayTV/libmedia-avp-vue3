@@ -46,6 +46,8 @@ const diagnosticsOpen = ref(false)
 const diagnosticsTab = ref('info')
 const playerLogs = ref([])
 const activeSource = shallowRef(null)
+const posterSource = shallowRef(props.src)
+const posterDismissed = ref(false)
 const visualPlaying = ref(false)
 const playbackFeedback = ref(null)
 const streamStalled = ref(false)
@@ -200,11 +202,16 @@ function handleEvent(name, payload) {
     case 'loading':
       publicError.value = null
       activeSource.value = null
+      if ((payload?.source ?? props.src) !== posterSource.value) {
+        posterSource.value = payload?.source ?? props.src
+        posterDismissed.value = false
+      }
       controlsVisible.value = true
       break
     case 'statechange':
       state.value = payload.state
       syncPlaybackState(payload.state)
+      if (payload.state === PlayerState.PLAYING) posterDismissed.value = true
       if (payload.state === PlayerState.PLAYING) armStallDetection()
       else stopStallDetection()
       if (
@@ -642,7 +649,7 @@ onBeforeUnmount(() => {
     <PlayerStatusOverlay
       :state="state"
       :error="publicError"
-      :poster="poster"
+      :poster="posterDismissed ? '' : poster"
       :busy="playbackBusy"
       :feedback="controls ? playbackFeedback : null"
       @retry="run(core.load(src))"

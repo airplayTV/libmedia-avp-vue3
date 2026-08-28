@@ -2,12 +2,12 @@
 
 基于 Vue 3 的 libmedia AVPlayer 封装，提供完整播放器、无头核心组件和组合式 API。消费项目可以是纯 JavaScript；不要求 `tsconfig.json`，也不要求在 `.vue` 文件中使用 `lang="ts"`。
 
-当前仓库版本为 `0.1.0`，尚未发布，且包仍为 `private: true`、`UNLICENSED`。本地联调可使用 `npm pack` 产生的 tarball；公开发布前必须先确定包装层许可证与包名归属。
+当前仓库版本为 `0.1.1`，通过 GitHub Release tarball 固定版本消费。包仍为 `private: true`、`UNLICENSED`，不作为公共 npm 包发布。
 
 ## 安装与 Vite 配置
 
 ```bash
-npm install ./libmedia-avp-vue3-0.1.0.tgz
+npm install ./libmedia-avp-vue3-0.1.1.tgz
 ```
 
 纯 JavaScript `vite.config.js`：

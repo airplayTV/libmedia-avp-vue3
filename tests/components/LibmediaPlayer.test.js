@@ -103,6 +103,34 @@ afterEach(() => {
 })
 
 describe('LibmediaPlayer', () => {
+  it('keeps the poster dismissed for the active source and restores it for a new source', async () => {
+    const harness = mountPlayer({ props: { poster: '/poster.jpg' } })
+    await flushPromises()
+
+    expect(harness.wrapper.find('.libmedia-status-overlay__poster').exists()).toBe(true)
+
+    const surface = harness.wrapper.get('.libmedia-player-core__surface')
+    await surface.trigger('click')
+    await flushPromises()
+    expect(harness.wrapper.find('.libmedia-status-overlay__poster').exists()).toBe(false)
+
+    await surface.trigger('click')
+    await flushPromises()
+    expect(harness.wrapper.find('.libmedia-status-overlay__poster').exists()).toBe(false)
+
+    harness.emit('statechange', {
+      state: PlayerState.LOADING,
+      previousState: PlayerState.PAUSED
+    })
+    harness.emit('loading', { state: PlayerState.LOADING, source: 'movie.mp4' })
+    await flushPromises()
+    expect(harness.wrapper.find('.libmedia-status-overlay__poster').exists()).toBe(false)
+
+    harness.emit('loading', { state: PlayerState.LOADING, source: 'next.mp4' })
+    await flushPromises()
+    expect(harness.wrapper.find('.libmedia-status-overlay__poster').exists()).toBe(true)
+  })
+
   it('toggles playback when the video surface is clicked', async () => {
     const harness = mountPlayer()
     await flushPromises()
