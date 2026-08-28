@@ -95,6 +95,7 @@
 .libmedia-control-button:hover,
 .libmedia-settings button:hover,
 .libmedia-status-overlay__action:hover {
+  color: var(--libmedia-text);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -123,6 +124,10 @@
 }
 
 .libmedia-control-button--primary {
+  color: var(--libmedia-accent);
+}
+
+.libmedia-control-button--primary:hover {
   color: var(--libmedia-accent);
 }
 

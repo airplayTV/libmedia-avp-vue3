@@ -212,6 +212,44 @@ test('matches the approved G icon sizing, weight and control alignment', async (
   expect(geometry.settingsHasCenterCircle).toBe(true)
 })
 
+test('keeps every control icon visible while hovered', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
+
+  const expectedIcons = [
+    { label: '播放', color: 'rgb(34, 197, 94)', fill: 'rgb(34, 197, 94)', stroke: 'none' },
+    { label: '静音', color: 'rgb(255, 255, 255)', fill: 'none', stroke: 'rgb(255, 255, 255)' },
+    { label: '播放设置', color: 'rgb(255, 255, 255)', fill: 'none', stroke: 'rgb(255, 255, 255)' },
+    { label: '进入全屏', color: 'rgb(255, 255, 255)', fill: 'none', stroke: 'rgb(255, 255, 255)' }
+  ]
+
+  for (const expected of expectedIcons) {
+    const button = page.getByRole('button', { name: expected.label, exact: true })
+    await button.hover()
+
+    const appearance = await button.locator('.libmedia-icon').evaluate((icon) => {
+      const style = getComputedStyle(icon)
+      return {
+        color: style.color,
+        display: style.display,
+        fill: style.fill,
+        opacity: style.opacity,
+        stroke: style.stroke,
+        visibility: style.visibility
+      }
+    })
+
+    expect(appearance).toEqual({
+      color: expected.color,
+      display: 'block',
+      fill: expected.fill,
+      opacity: '1',
+      stroke: expected.stroke,
+      visibility: 'visible'
+    })
+  }
+})
+
 test('moves a non-blocking cursor glow and tightens it over the primary action', async ({ page }) => {
   await page.goto('/')
   const aura = page.locator('.cursor-aura')

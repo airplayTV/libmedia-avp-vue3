@@ -207,8 +207,8 @@ button,
   cursor: pointer;
 }
 
-button:hover,
-.file-action:hover {
+.source-panel button:hover,
+.source-panel .file-action:hover {
   border-color: #94a3b8;
   color: #0f172a;
   background: #e8edf3;
