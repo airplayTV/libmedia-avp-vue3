@@ -77,6 +77,19 @@ describe('player controller', () => {
     expect(harness.controller.state).toBe(PlayerState.PAUSED)
   })
 
+  it('keeps a playback error terminal when the engine later drains and emits ended', async () => {
+    const harness = createHarness()
+    await harness.controller.load('broken-hls.m3u8')
+    await harness.controller.play()
+
+    harness.engine.emit('error', new Error('demux failed'))
+    harness.engine.emit('ended')
+
+    expect(harness.controller.state).toBe(PlayerState.ERROR)
+    expect(harness.events.filter(([name]) => name === 'error')).toHaveLength(1)
+    expect(harness.events.filter(([name]) => name === 'ended')).toHaveLength(0)
+  })
+
   it('rejects an empty source before creating the engine', async () => {
     const harness = createHarness()
 

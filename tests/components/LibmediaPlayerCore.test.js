@@ -43,6 +43,19 @@ afterEach(() => {
 })
 
 describe('LibmediaPlayerCore', () => {
+  it('keeps engine looping disabled and loops only after a natural ended event', async () => {
+    const harness = mountCore({ src: 'movie.m3u8', loop: true })
+    await flushPromises()
+
+    expect(harness.factoryOptions().engineOptions.loop).toBe(false)
+
+    harness.factoryOptions().onEvent('ended', { state: 'ended' })
+    await flushPromises()
+
+    expect(harness.controller.calls).toContainEqual(['seek', 0])
+    expect(harness.controller.calls).toContainEqual(['play'])
+  })
+
   it('provides custom-control commands through its default slot', async () => {
     const controller = new CoreController()
     let slotProps

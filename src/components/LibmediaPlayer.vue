@@ -73,7 +73,6 @@ const playbackFeedback = ref(null)
 const streamStalled = ref(false)
 const fullscreenMode = ref(null)
 const fullscreenDesired = ref(false)
-const replayVisible = ref(false)
 const errorNotice = ref(null)
 const miniAnchorRef = ref(null)
 const miniActive = ref(false)
@@ -89,13 +88,12 @@ let commandedPlaying = false
 let playbackCommandPending = false
 let lastInteractionWasKeyboard = false
 let revealOnlySurfaceClick = false
-let runtimeRecoveryContext = null
 let failedPlaybackContext = null
+let pendingRecoveryError = null
 let recoveryPromise = null
 let recoverySource = null
 let recoveryEpoch = 0
 let sourceGeneration = 0
-let autoRecoveryBudget = { source: null, time: 0, attempts: 0 }
 let bodyOverflowBeforeFullscreen = null
 let fullscreenEpoch = 0
 let miniObserver = null
@@ -104,8 +102,6 @@ let disposed = false
 const PLAYBACK_FEEDBACK_DURATION = 600
 const PLAYBACK_STALL_DELAY = 2000
 const CONTROLS_HIDE_DELAY = 5000
-const AUTO_RECOVERY_POSITION_WINDOW = 3
-const AUTO_RECOVERY_RESET_PROGRESS = 5
 
 const surfaceToggleStates = new Set([
   PlayerState.READY,
@@ -277,6 +273,11 @@ function clearErrorNoticeTimer() {
   }
 }
 
+function clearErrorNotice() {
+  clearErrorNoticeTimer()
+  errorNotice.value = null
+}
+
 function showErrorNotice(error) {
   clearErrorNoticeTimer()
   const code = safeLogCode(error?.code)
@@ -363,32 +364,14 @@ function sameSource(left, right) {
   return Object.is(left, right)
 }
 
-function resetAutoRecoveryBudget(source = null, time = 0) {
-  autoRecoveryBudget = { source, time, attempts: 0 }
-}
-
-function reserveAutoRecovery(context) {
-  if (
-    !sameSource(autoRecoveryBudget.source, context.source) ||
-    Math.abs(autoRecoveryBudget.time - context.time) > AUTO_RECOVERY_POSITION_WINDOW
-  ) {
-    resetAutoRecoveryBudget(context.source, context.time)
-  }
-  if (autoRecoveryBudget.attempts >= 1) return false
-  autoRecoveryBudget.attempts += 1
-  return true
-}
-
-function invalidateRecovery({ clearFailed = true, resetBudget = false } = {}) {
+function invalidateRecovery({ clearFailed = true } = {}) {
   recoveryEpoch += 1
   recoveryPromise = null
   recoverySource = null
-  runtimeRecoveryContext = null
+  pendingRecoveryError = null
   if (clearFailed) {
     failedPlaybackContext = null
-    replayVisible.value = false
   }
-  if (resetBudget) resetAutoRecoveryBudget()
 }
 
 function handleEvent(name, payload) {
@@ -402,11 +385,10 @@ function handleEvent(name, payload) {
           recoverySource !== null && sameSource(recoverySource, loadingSource)
         )
         if (!isRecoveryLoad) {
-          invalidateRecovery({ clearFailed: true, resetBudget: true })
+          invalidateRecovery({ clearFailed: true })
         }
       }
       publicError.value = null
-      replayVisible.value = false
       activeSource.value = payload?.source ?? activeSource.value ?? props.src
       if ((payload?.source ?? props.src) !== posterSource.value) {
         posterSource.value = payload?.source ?? props.src
@@ -420,12 +402,11 @@ function handleEvent(name, payload) {
         PlayerState.PAUSED,
         PlayerState.SEEKING
       ].includes(payload.previousState)) {
-        runtimeRecoveryContext = {
+        failedPlaybackContext = {
           source: activeSource.value ?? props.src,
           time: currentTime.value,
           resumePlaying: desiredPlaying || payload.previousState === PlayerState.PLAYING
         }
-        failedPlaybackContext = runtimeRecoveryContext
       }
       state.value = payload.state
       syncPlaybackState(payload.state)
@@ -439,7 +420,6 @@ function handleEvent(name, payload) {
         publicError.value = null
       }
       if (payload.state === PlayerState.PLAYING) {
-        replayVisible.value = false
         failedPlaybackContext = null
         if (!miniSourceVisible.value) void enterMiniMode()
       }
@@ -461,13 +441,6 @@ function handleEvent(name, payload) {
       }
       currentTime.value = payload.currentTime
       duration.value = payload.duration
-      if (
-        autoRecoveryBudget.attempts > 0 &&
-        sameSource(autoRecoveryBudget.source, activeSource.value) &&
-        payload.currentTime >= autoRecoveryBudget.time + AUTO_RECOVERY_RESET_PROGRESS
-      ) {
-        resetAutoRecoveryBudget()
-      }
       break
     case 'durationchange':
     case 'ready':
@@ -480,20 +453,14 @@ function handleEvent(name, payload) {
       break
     case 'error':
       publicError.value = payload
-      showErrorNotice(payload)
       controlsVisible.value = true
       clearHideTimer()
       if (payload?.code === 'AUTOPLAY_BLOCKED') {
-        replayVisible.value = false
+        showErrorNotice(payload)
       } else if (recoveryPromise || recoverySource !== null) {
-        replayVisible.value = false
-      } else if (runtimeRecoveryContext && payload?.recoverable) {
-        const context = runtimeRecoveryContext
-        runtimeRecoveryContext = null
-        if (reserveAutoRecovery(context)) void recoverPlayback(context)
-        else replayVisible.value = true
+        pendingRecoveryError = payload
       } else {
-        replayVisible.value = true
+        showErrorNotice(payload)
         failedPlaybackContext ??= {
           source: activeSource.value ?? props.src,
           time: currentTime.value,
@@ -615,6 +582,19 @@ function requestPlayback(targetPlaying) {
   visualPlaying.value = targetPlaying
   showPlaybackFeedback(targetPlaying ? 'pause' : 'play')
   if (!targetPlaying) stopStallDetection()
+  if (
+    targetPlaying &&
+    (state.value === PlayerState.ERROR || failedPlaybackContext)
+  ) {
+    const context = failedPlaybackContext ?? {
+      source: activeSource.value ?? props.src,
+      time: currentTime.value,
+      resumePlaying: true
+    }
+    failedPlaybackContext = context
+    void recoverPlayback(context, true)
+    return
+  }
   void drainPlaybackIntent()
 }
 
@@ -628,12 +608,8 @@ function recoveryIsCurrent(epoch, source) {
 
 async function restoreFailedPlayback(context, forcePlay, epoch) {
   const source = context?.source ?? activeSource.value ?? props.src
-  if (!source) {
-    replayVisible.value = true
-    return false
-  }
+  if (!source) return false
 
-  replayVisible.value = false
   try {
     const generationBeforeLoad = sourceGeneration
     await coreRef.value?.load(source)
@@ -654,15 +630,24 @@ async function restoreFailedPlayback(context, forcePlay, epoch) {
       commandedPlaying = true
     }
     publicError.value = null
+    pendingRecoveryError = null
+    clearErrorNotice()
     return true
   } catch {
-    if (!disposed && epoch === recoveryEpoch) replayVisible.value = true
+    if (!disposed && epoch === recoveryEpoch) {
+      if (pendingRecoveryError) showErrorNotice(pendingRecoveryError)
+    }
     return false
   }
 }
 
-function recoverPlayback(context, forcePlay = false) {
-  if (recoveryPromise) return recoveryPromise
+function recoverPlayback(context, forcePlay = false, replace = false) {
+  if (recoveryPromise && !replace) return recoveryPromise
+  if (replace) {
+    recoveryEpoch += 1
+    recoveryPromise = null
+    recoverySource = null
+  }
   const source = context?.source ?? activeSource.value ?? props.src
   const epoch = ++recoveryEpoch
   recoverySource = source
@@ -674,16 +659,6 @@ function recoverPlayback(context, forcePlay = false) {
     recoverySource = null
   })
   return promise
-}
-
-function replayPlayback() {
-  const context = failedPlaybackContext ?? {
-    source: activeSource.value ?? props.src,
-    time: currentTime.value,
-    resumePlaying: true
-  }
-  failedPlaybackContext = context
-  return recoverPlayback({ ...context, resumePlaying: true }, true)
 }
 
 function togglePlayback() {
@@ -910,7 +885,27 @@ function buildPlayerInfo() {
 
 function seekTo(value) {
   showControls()
-  run(coreRef.value?.seek(Math.min(Math.max(0, value), duration.value || 0)))
+  const target = Math.min(Math.max(0, value), duration.value || 0)
+  run(seekPlayback(target))
+}
+
+function seekPlayback(value) {
+  if (!Number.isFinite(value) || value < 0) {
+    return coreRef.value?.seek(value)
+  }
+  if (
+    state.value === PlayerState.ERROR ||
+    failedPlaybackContext
+  ) {
+    const context = {
+      source: activeSource.value ?? props.src,
+      time: value,
+      resumePlaying: true
+    }
+    failedPlaybackContext = context
+    return recoverPlayback(context, true, true)
+  }
+  return coreRef.value?.seek(value)
 }
 
 function setVolume(value) {
@@ -943,7 +938,7 @@ watch(() => props.miniMode, setupMiniObserver)
 
 watch(() => props.src, (source, previousSource) => {
   if (sameSource(source, previousSource)) return
-  invalidateRecovery({ clearFailed: true, resetBudget: true })
+  invalidateRecovery({ clearFailed: true })
 }, { flush: 'sync' })
 
 function refreshTracks(core) {
@@ -1078,12 +1073,12 @@ function handleKeydown(event) {
 }
 
 const load = (source = props.src) => {
-  invalidateRecovery({ clearFailed: true, resetBudget: true })
+  invalidateRecovery({ clearFailed: true })
   return coreRef.value?.load(source)
 }
 const pause = () => coreRef.value?.pause()
 const stop = () => coreRef.value?.stop()
-const seek = (seconds) => coreRef.value?.seek(seconds)
+const seek = (seconds) => seekPlayback(seconds)
 const setPublicVolume = (value) => coreRef.value?.setVolume(value)
 const mute = () => coreRef.value?.mute()
 const unmute = () => coreRef.value?.unmute()
@@ -1194,8 +1189,6 @@ onBeforeUnmount(() => {
       :poster="posterDismissed ? '' : poster"
       :busy="playbackBusy"
       :feedback="controls ? playbackFeedback : null"
-      :replay="replayVisible"
-      @replay="run(replayPlayback())"
       @play="requestPlayback(true)"
     >
       <template v-if="$slots.loading" #loading="slotProps">

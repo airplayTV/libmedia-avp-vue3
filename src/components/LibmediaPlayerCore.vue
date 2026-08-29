@@ -49,7 +49,7 @@ const emit = defineEmits([
 const rootRef = ref(null)
 const engineOptions = computed(() => ({
   ...props.engineOptions,
-  loop: props.loop
+  loop: false
 }))
 
 let player
@@ -58,6 +58,8 @@ function handleControllerEvent(name, payload) {
   emit(name, payload)
   if (name === 'ready' && props.autoplay) {
     void player.play().catch(() => {})
+  } else if (name === 'ended' && props.loop) {
+    void player.seek(0).then(() => player.play()).catch(() => {})
   }
 }
 

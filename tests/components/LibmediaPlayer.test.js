@@ -396,7 +396,7 @@ describe('LibmediaPlayer', () => {
     dialog = harness.wrapper.get('.libmedia-diagnostics')
     expect(dialog.get('[role="tab"][aria-selected="true"]').text()).toBe('播放器信息')
     expect(dialog.text()).toContain('libmedia-avp-vue3')
-    expect(dialog.text()).toContain('0.1.6')
+    expect(dialog.text()).toContain('0.1.7')
     expect(dialog.text()).toContain('AVPlayer / libmedia 版本')
     expect(dialog.text()).toContain('1.3.1')
     expect(dialog.findAll('button').map((button) => button.text())).not.toContain('复制')
@@ -1318,7 +1318,98 @@ describe('LibmediaPlayer', () => {
       .toContain('libmedia-player--controls-hidden')
   })
 
-  it('automatically reloads a playback failure and resumes from the last position', async () => {
+  it('waits for a manual play request before reloading and resuming from the failed position', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    const loadCallsBeforeError = controller.calls.filter(([name]) => name === 'load').length
+    const playCallsBeforeError = controller.calls.filter(([name]) => name === 'play').length
+
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_TIMEOUT',
+      message: 'private fragment URL',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(loadCallsBeforeError)
+    expect(controller.calls.filter(([name]) => name === 'seek')).toHaveLength(0)
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(playCallsBeforeError)
+    expect(harness.wrapper.find('.libmedia-error-notice').exists()).toBe(true)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(false)
+
+    harness.wrapper.findComponent({ name: 'PlayerControls' }).vm.$emit('toggle-play')
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(loadCallsBeforeError + 1)
+    expect(controller.calls).toContainEqual(['seek', 42])
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(playCallsBeforeError + 1)
+  })
+
+  it('retries the same failed position on every manual play request while the resource stays unavailable', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_LOAD_FAILED',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    const loadCallsBeforeRetry = controller.calls.filter(([name]) => name === 'load').length
+    const playCallsBeforeRetry = controller.calls.filter(([name]) => name === 'play').length
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      controller.emit('statechange', {
+        state: PlayerState.LOADING,
+        previousState: PlayerState.ERROR
+      })
+      controller.emit('loading', { state: PlayerState.LOADING, source })
+      controller.emit('statechange', {
+        state: PlayerState.ERROR,
+        previousState: PlayerState.LOADING
+      })
+      controller.emit('error', {
+        code: 'MEDIA_LOAD_FAILED',
+        recoverable: true,
+        details: {}
+      })
+      throw new Error('fragment is still unavailable')
+    }
+
+    const controls = harness.wrapper.findComponent({ name: 'PlayerControls' })
+    controls.vm.$emit('toggle-play')
+    await flushPromises()
+    controls.vm.$emit('toggle-play')
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(loadCallsBeforeRetry + 2)
+    expect(controller.calls.filter(([name]) => name === 'seek')).toHaveLength(0)
+    expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(playCallsBeforeRetry)
+    expect(harness.wrapper.find('.libmedia-error-notice').exists()).toBe(true)
+  })
+
+  it('reloads and resumes at a manually selected position after playback fails', async () => {
     const harness = mountPlayer()
     await flushPromises()
     const controller = harness.controller()
@@ -1329,6 +1420,59 @@ describe('LibmediaPlayer', () => {
     harness.emit('timeupdate', { currentTime: 42, duration: 120 })
     controller.load = async (source) => {
       controller.calls.push(['load', source])
+      throw new Error('fragment is still unavailable')
+    }
+
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_TIMEOUT',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    expect(harness.wrapper.find('.libmedia-error-notice').exists()).toBe(true)
+
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      controller.emit('statechange', {
+        state: PlayerState.LOADING,
+        previousState: PlayerState.ERROR
+      })
+      controller.emit('loading', { state: PlayerState.LOADING, source })
+      controller.emit('statechange', {
+        state: PlayerState.READY,
+        previousState: PlayerState.LOADING
+      })
+      controller.emit('ready', { duration: 120, state: PlayerState.READY, source })
+    }
+
+    harness.wrapper.findComponent({ name: 'PlayerControls' }).vm.$emit('seek', 70)
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(2)
+    expect(controller.calls).toContainEqual(['seek', 70])
+    expect(controller.calls.filter(([name]) => name === 'play').length).toBeGreaterThan(0)
+  })
+
+  it('uses the manual seek target instead of the failed playback position', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    const automaticLoad = Promise.withResolvers()
+    let recoveryLoads = 0
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      recoveryLoads += 1
+      if (recoveryLoads === 1) await automaticLoad.promise
       controller.emit('statechange', {
         state: PlayerState.LOADING,
         previousState: PlayerState.ERROR
@@ -1347,16 +1491,75 @@ describe('LibmediaPlayer', () => {
     })
     harness.emit('error', {
       code: 'MEDIA_TIMEOUT',
-      message: 'private fragment URL',
       recoverable: true,
       details: {}
     })
     await flushPromises()
 
-    expect(controller.calls).toContainEqual(['load', 'movie.mp4'])
-    expect(controller.calls).toContainEqual(['seek', 42])
+    harness.wrapper.findComponent({ name: 'PlayerControls' }).vm.$emit('seek', 70)
+    await flushPromises()
+    automaticLoad.resolve()
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(2)
+    expect(controller.calls).toContainEqual(['seek', 70])
+    expect(controller.calls).not.toContainEqual(['seek', 42])
+  })
+
+  it('recovers the failed player when the public seek method selects a new position', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    const controller = harness.controller()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    harness.emit('timeupdate', { currentTime: 42, duration: 120 })
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      throw new Error('fragment is still unavailable')
+    }
+
+    harness.emit('statechange', {
+      state: PlayerState.ERROR,
+      previousState: PlayerState.PLAYING
+    })
+    harness.emit('error', {
+      code: 'MEDIA_TIMEOUT',
+      recoverable: true,
+      details: {}
+    })
+    await flushPromises()
+
+    controller.load = async (source) => {
+      controller.calls.push(['load', source])
+      controller.emit('statechange', {
+        state: PlayerState.LOADING,
+        previousState: PlayerState.ERROR
+      })
+      controller.emit('loading', { state: PlayerState.LOADING, source })
+      controller.emit('statechange', {
+        state: PlayerState.READY,
+        previousState: PlayerState.LOADING
+      })
+      controller.emit('ready', { duration: 120, state: PlayerState.READY, source })
+    }
+
+    await harness.wrapper.vm.seek(75)
+    await flushPromises()
+
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(2)
+    expect(controller.calls).toContainEqual(['seek', 75])
     expect(controller.calls.filter(([name]) => name === 'play').length).toBeGreaterThan(0)
-    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(false)
+  })
+
+  it('keeps the public seek target unbounded by the current UI duration', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+
+    await harness.wrapper.vm.seek(150)
+
+    expect(harness.controller().calls).toContainEqual(['seek', 150])
   })
 
   it('does not apply an old recovery position after an imperative source change', async () => {
@@ -1441,7 +1644,7 @@ describe('LibmediaPlayer', () => {
     expect(controller.calls.filter(([name]) => name === 'play')).toHaveLength(0)
   })
 
-  it('stops automatic recovery after the same failing segment repeats', async () => {
+  it('does not automatically recover repeated failures at the same segment', async () => {
     const harness = mountPlayer()
     await flushPromises()
     const controller = harness.controller()
@@ -1478,11 +1681,11 @@ describe('LibmediaPlayer', () => {
       harness.emit('timeupdate', { currentTime: 42.5, duration: 120 })
     }
 
-    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(2)
-    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(true)
+    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(1)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(false)
   })
 
-  it('shows a center replay icon after recovery fails and expires only the safe error notice', async () => {
+  it('expires the safe error notice without exposing a replay action', async () => {
     vi.useFakeTimers()
     const harness = mountPlayer()
     await flushPromises()
@@ -1503,7 +1706,7 @@ describe('LibmediaPlayer', () => {
     })
     await flushPromises()
 
-    expect(harness.wrapper.get('[aria-label="重播"] .libmedia-icon').exists()).toBe(true)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(false)
     const notice = harness.wrapper.get('.libmedia-error-notice')
     expect(notice.text()).toContain('MEDIA_LOAD_FAILED')
     expect(notice.text()).not.toContain('private.example')
@@ -1511,11 +1714,7 @@ describe('LibmediaPlayer', () => {
 
     await vi.advanceTimersByTimeAsync(5000)
     expect(harness.wrapper.find('.libmedia-error-notice').exists()).toBe(false)
-    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(true)
-
-    await harness.wrapper.get('[aria-label="重播"]').trigger('click')
-    await flushPromises()
-    expect(controller.calls.filter(([name]) => name === 'load')).toHaveLength(3)
+    expect(harness.wrapper.find('[aria-label="重播"]').exists()).toBe(false)
   })
 
   it('cancels a pending fullscreen request before it can fall back after unmount', async () => {
