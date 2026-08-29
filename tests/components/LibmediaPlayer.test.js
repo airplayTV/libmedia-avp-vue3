@@ -78,6 +78,7 @@ function mountPlayer(options = {}) {
   let controller
   let emit
   const wrapper = mount(LibmediaPlayer, {
+    attachTo: options.attachTo,
     props: { src: 'movie.mp4', ...options.props },
     slots: options.slots,
     global: {
@@ -97,9 +98,48 @@ function mountPlayer(options = {}) {
   }
 }
 
+function installIntersectionObserver() {
+  let instance = null
+
+  globalThis.IntersectionObserver = class IntersectionObserver {
+    constructor(callback) {
+      this.callback = callback
+      this.targets = new Set()
+      instance = this
+    }
+
+    observe(target) {
+      this.targets.add(target)
+    }
+
+    unobserve(target) {
+      this.targets.delete(target)
+    }
+
+    disconnect() {
+      this.targets.clear()
+    }
+
+    emit(target, { isIntersecting, intersectionRatio }) {
+      this.callback([{
+        target,
+        isIntersecting,
+        intersectionRatio,
+        boundingClientRect: target.getBoundingClientRect(),
+        intersectionRect: target.getBoundingClientRect(),
+        rootBounds: null,
+        time: 0
+      }], this)
+    }
+  }
+
+  return () => instance
+}
+
 afterEach(() => {
   vi.useRealTimers()
   delete globalThis.ResizeObserver
+  delete globalThis.IntersectionObserver
   delete navigator.clipboard
   delete document.execCommand
   delete document.fullscreenElement
@@ -356,7 +396,7 @@ describe('LibmediaPlayer', () => {
     dialog = harness.wrapper.get('.libmedia-diagnostics')
     expect(dialog.get('[role="tab"][aria-selected="true"]').text()).toBe('播放器信息')
     expect(dialog.text()).toContain('libmedia-avp-vue3')
-    expect(dialog.text()).toContain('0.1.5')
+    expect(dialog.text()).toContain('0.1.6')
     expect(dialog.text()).toContain('AVPlayer / libmedia 版本')
     expect(dialog.text()).toContain('1.3.1')
     expect(dialog.findAll('button').map((button) => button.text())).not.toContain('复制')
@@ -706,6 +746,220 @@ describe('LibmediaPlayer', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }))
     await flushPromises()
     expect(harness.controller().calls.filter(([name]) => name === 'play')).toHaveLength(1)
+  })
+
+  it('seeks with arrow keys after a playback control receives focus', async () => {
+    const harness = mountPlayer()
+    await flushPromises()
+    harness.emit('timeupdate', { currentTime: 30, duration: 120 })
+
+    await harness.wrapper.get('.libmedia-control-button--primary').trigger('keydown', {
+      key: 'ArrowRight'
+    })
+    await flushPromises()
+
+    expect(harness.controller().calls).toContainEqual(['seek', 35])
+  })
+
+  it('moves keyboard focus to the player after the video surface is pressed', async () => {
+    const harness = mountPlayer({ attachTo: document.body, props: { src: null } })
+    await flushPromises()
+
+    await harness.wrapper.get('.libmedia-player-core__surface').trigger('pointerdown')
+
+    expect(document.activeElement).toBe(
+      harness.wrapper.get('.libmedia-player').element
+    )
+  })
+
+  it('enters mini mode when a playing source leaves the viewport', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+
+    const player = harness.wrapper.get('.libmedia-player')
+    expect(observer()).not.toBeNull()
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+
+    expect(player.classes()).toContain('libmedia-player--mini')
+  })
+
+  it('enters mini mode when playback starts after the source left the viewport', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    const player = harness.wrapper.get('.libmedia-player')
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+    expect(player.classes()).not.toContain('libmedia-player--mini')
+
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    await flushPromises()
+
+    expect(player.classes()).toContain('libmedia-player--mini')
+  })
+
+  it('returns the mini player inline when its original position is visible', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+
+    const player = harness.wrapper.get('.libmedia-player')
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PAUSED,
+      previousState: PlayerState.PLAYING
+    })
+    const anchor = harness.wrapper.get('.libmedia-mini-anchor')
+    observer().emit(anchor.element, {
+      isIntersecting: true,
+      intersectionRatio: 1
+    })
+    await flushPromises()
+
+    expect(player.classes()).not.toContain('libmedia-player--mini')
+  })
+
+  it('keeps a dismissed mini player closed until its source position is visible again', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+
+    const player = harness.wrapper.get('.libmedia-player')
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+
+    const close = harness.wrapper.find('.libmedia-mini__close')
+    expect(close.exists()).toBe(true)
+    await close.trigger('click')
+    await flushPromises()
+    expect(player.classes()).not.toContain('libmedia-player--mini')
+
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+    expect(player.classes()).not.toContain('libmedia-player--mini')
+
+    observer().emit(player.element, {
+      isIntersecting: true,
+      intersectionRatio: 1
+    })
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+    expect(player.classes()).toContain('libmedia-player--mini')
+  })
+
+  it('keeps a compact playback toggle available after pausing in mini mode', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    const player = harness.wrapper.get('.libmedia-player')
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PAUSED,
+      previousState: PlayerState.PLAYING
+    })
+
+    const toggle = harness.wrapper.find('.libmedia-mini__toggle')
+    expect(toggle.exists()).toBe(true)
+    await toggle.trigger('click')
+    await flushPromises()
+
+    expect(harness.controller().calls.filter(([name]) => name === 'play'))
+      .toHaveLength(1)
+  })
+
+  it('scrolls back to the source position from the mini restore action', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    const player = harness.wrapper.get('.libmedia-player')
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+
+    const anchor = harness.wrapper.get('.libmedia-mini-anchor')
+    anchor.element.scrollIntoView = vi.fn()
+    const restore = harness.wrapper.find('.libmedia-mini__restore')
+    expect(restore.exists()).toBe(true)
+    await restore.trigger('click')
+    await flushPromises()
+
+    expect(anchor.element.scrollIntoView).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'center'
+    })
+    expect(player.classes()).not.toContain('libmedia-player--mini')
+  })
+
+  it('returns inline when mini mode is disabled at runtime', async () => {
+    const observer = installIntersectionObserver()
+    const harness = mountPlayer({ props: { miniMode: true } })
+    await flushPromises()
+    harness.emit('statechange', {
+      state: PlayerState.PLAYING,
+      previousState: PlayerState.READY
+    })
+    const player = harness.wrapper.get('.libmedia-player')
+    observer().emit(player.element, {
+      isIntersecting: false,
+      intersectionRatio: 0
+    })
+    await flushPromises()
+    expect(player.classes()).toContain('libmedia-player--mini')
+
+    await harness.wrapper.setProps({ miniMode: false })
+    await flushPromises()
+
+    expect(player.classes()).not.toContain('libmedia-player--mini')
   })
 
   it('falls back to video-only playback when AudioContext is unavailable', async () => {

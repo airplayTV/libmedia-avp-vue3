@@ -176,7 +176,7 @@ test('shows real AVPlayer media statistics and non-copyable player versions', as
   await expect(infoValue('总码率')).not.toHaveText('--')
 
   await dialog.getByRole('tab', { name: '播放器信息' }).click()
-  await expect(infoValue('播放器库版本')).toHaveText('0.1.5')
+  await expect(infoValue('播放器库版本')).toHaveText('0.1.6')
   await expect(infoValue('AVPlayer / libmedia 版本')).toHaveText('1.3.1')
   await expect(dialog.getByRole('button', { name: /^复制/ })).toHaveCount(0)
 })
@@ -197,6 +197,7 @@ test('renders the aligned rounded progress treatment without a black thumb ring'
     const thumbStyle = getComputedStyle(thumb)
 
     return {
+      progressHeight: progressRect.height,
       leftDifference: Math.abs(progressRect.left - rowRect.left),
       rightDifference: Math.abs(progressRect.right - rowRect.right),
       playedColor: playedStyle.backgroundColor,
@@ -207,6 +208,7 @@ test('renders the aligned rounded progress treatment without a black thumb ring'
     }
   })
 
+  expect(appearance.progressHeight).toBe(18)
   expect(appearance.leftDifference).toBeLessThan(1)
   expect(appearance.rightDifference).toBeLessThan(1)
   expect(appearance.playedColor).toBe('rgb(34, 197, 94)')
@@ -216,18 +218,27 @@ test('renders the aligned rounded progress treatment without a black thumb ring'
   expect(appearance.thumbShadow).not.toContain('rgb(0, 0, 0)')
 })
 
-test('matches the approved G icon sizing, weight and control alignment', async ({ page }) => {
+test('keeps the compact lower control row with unified rounded icons', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
 
   const geometry = await page.locator('.libmedia-controls__row').evaluate((row) => {
-    const buttons = [...row.querySelectorAll(':scope > .libmedia-control-button')]
+    const buttons = [...row.querySelectorAll('.libmedia-control-button')]
     const icons = buttons.map((button) => button.querySelector('.libmedia-icon'))
     const primary = icons[0]
     const settings = icons[2]
+    const primaryGlyph = primary.querySelector('path').getBBox()
+    const player = row.closest('.libmedia-player')
+    const progressTrack = player.querySelector('.libmedia-progress__track')
+    const playerRect = player.getBoundingClientRect()
+    const rowRect = row.getBoundingClientRect()
+    const progressTrackRect = progressTrack.getBoundingClientRect()
+    const primaryRect = primary.getBoundingClientRect()
 
     return {
-      rowHeight: row.getBoundingClientRect().height,
+      rowHeight: rowRect.height,
+      rowBottomInset: playerRect.bottom - rowRect.bottom,
+      progressToIconGap: primaryRect.top - progressTrackRect.bottom,
       buttons: buttons.map((button, index) => {
         const buttonRect = button.getBoundingClientRect()
         const iconRect = icons[index].getBoundingClientRect()
@@ -247,19 +258,32 @@ test('matches the approved G icon sizing, weight and control alignment', async (
       }),
       primaryFill: primary.getAttribute('fill'),
       primaryStroke: primary.getAttribute('stroke'),
+      primaryGlyphWidth: primaryGlyph.width,
+      primaryGlyphHeight: primaryGlyph.height,
       outlineStrokeWidth: settings.getAttribute('stroke-width'),
       settingsHasCenterCircle: Boolean(settings.querySelector('circle'))
     }
   })
 
-  expect(geometry.rowHeight).toBe(56)
-  for (const button of geometry.buttons) {
+  expect(geometry.rowHeight).toBe(48)
+  expect(geometry.rowBottomInset).toBe(4)
+  expect(geometry.progressToIconGap).toBe(11)
+  expect(geometry.buttons[0]).toEqual(expect.objectContaining({
+    width: 44,
+    height: 44,
+    radius: '7px',
+    iconWidth: 28,
+    iconHeight: 28
+  }))
+  expect(geometry.primaryGlyphWidth).toBeGreaterThanOrEqual(16)
+  expect(geometry.primaryGlyphHeight).toBeGreaterThanOrEqual(17)
+  for (const button of geometry.buttons.slice(1)) {
     expect(button).toEqual(expect.objectContaining({
       width: 44,
       height: 44,
       radius: '7px',
-      iconWidth: 20,
-      iconHeight: 20
+      iconWidth: 24,
+      iconHeight: 24
     }))
     expect(button.centerDifferenceX).toBeLessThan(0.5)
     expect(button.centerDifferenceY).toBeLessThan(0.5)
@@ -268,6 +292,90 @@ test('matches the approved G icon sizing, weight and control alignment', async (
   expect(geometry.primaryStroke).toBe('none')
   expect(geometry.outlineStrokeWidth).toBe('1.8')
   expect(geometry.settingsHasCenterCircle).toBe(true)
+
+  const settingsButton = page.getByRole('button', { name: '播放设置' })
+  await settingsButton.hover()
+  expect(await settingsButton.evaluate((button) => getComputedStyle(button).backgroundColor))
+    .toBe('rgba(0, 0, 0, 0)')
+})
+
+test('places volume after playback and reveals its slider on hover or keyboard focus', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
+
+  const row = page.locator('.libmedia-controls__row')
+  const volumeGroup = row.locator('.libmedia-controls__volume-group')
+  await expect(volumeGroup).toHaveCount(1)
+  expect(await row.evaluate((element) => [...element.children].slice(0, 3).map((child) => {
+    if (child.classList.contains('libmedia-control-button--primary')) return 'playback'
+    if (child.classList.contains('libmedia-controls__volume-group')) return 'volume'
+    if (child.classList.contains('libmedia-controls__time')) return 'time'
+    return 'other'
+  }))).toEqual(['playback', 'volume', 'time'])
+
+  const slider = volumeGroup.locator('.libmedia-controls__volume')
+  const sliderAppearance = () => slider.evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    opacity: getComputedStyle(element).opacity,
+    pointerEvents: getComputedStyle(element).pointerEvents
+  }))
+
+  await page.mouse.move(0, 0)
+  await expect.poll(sliderAppearance).toEqual({
+    width: 0,
+    opacity: '0',
+    pointerEvents: 'none'
+  })
+  await volumeGroup.hover()
+  await expect.poll(sliderAppearance).toEqual({
+    width: 86,
+    opacity: '1',
+    pointerEvents: 'auto'
+  })
+
+  await page.mouse.move(0, 0)
+  await volumeGroup.getByRole('button').focus()
+  await expect.poll(sliderAppearance).toEqual({
+    width: 86,
+    opacity: '1',
+    pointerEvents: 'auto'
+  })
+  await row.getByRole('button', { name: '播放设置' }).focus()
+  await expect.poll(sliderAppearance).toEqual({
+    width: 0,
+    opacity: '0',
+    pointerEvents: 'none'
+  })
+})
+
+test('keeps the pause glyph large and visibly rounded', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('[data-example-state]')).toHaveText(/ready|playing|ended/)
+  const button = page.locator('.libmedia-control-button--primary')
+  await button.click()
+  await expect(button).toHaveAttribute('aria-label', '暂停')
+
+  const appearance = await button.locator('.libmedia-icon').evaluate((icon) => {
+    const bars = [...icon.querySelectorAll('rect')]
+    const rects = bars.map((bar) => bar.getBoundingClientRect())
+    const left = Math.min(...rects.map((rect) => rect.left))
+    const right = Math.max(...rects.map((rect) => rect.right))
+    const top = Math.min(...rects.map((rect) => rect.top))
+    const bottom = Math.max(...rects.map((rect) => rect.bottom))
+    return {
+      iconWidth: icon.getBoundingClientRect().width,
+      iconHeight: icon.getBoundingClientRect().height,
+      glyphWidth: right - left,
+      glyphHeight: bottom - top,
+      radii: bars.map((bar) => bar.rx.baseVal.value)
+    }
+  })
+
+  expect(appearance.iconWidth).toBe(28)
+  expect(appearance.iconHeight).toBe(28)
+  expect(appearance.glyphWidth).toBeGreaterThanOrEqual(17)
+  expect(appearance.glyphHeight).toBeGreaterThanOrEqual(20)
+  expect(appearance.radii.every((radius) => radius >= 2)).toBe(true)
 })
 
 test('keeps long diagnostics content reachable inside a short player', async ({ page }) => {
@@ -433,7 +541,7 @@ test('disables the cursor glow when reduced motion is requested', async ({ page 
 })
 
 test.describe('mobile controls', () => {
-  test.use({ viewport: { width: 375, height: 812 } })
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true })
 
   test('keeps the complete time and every control inside the player', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
@@ -446,16 +554,22 @@ test.describe('mobile controls', () => {
     await expect(player.locator('.libmedia-controls__time')).toHaveText(
       /^\d{2}:\d{2} \/ \d{2}:\d{2}$/
     )
+    const volumeGroup = player.locator('.libmedia-controls__volume-group')
+    await expect(volumeGroup).toHaveCount(1)
+    await expect(volumeGroup.locator('.libmedia-controls__volume')).toHaveCSS('display', 'none')
+    const muteButton = volumeGroup.getByRole('button', { name: '静音' })
+    await muteButton.click()
+    await expect(volumeGroup.getByRole('button', { name: '取消静音' })).toBeVisible()
 
     const layout = await player.evaluate((element) => {
       const playerRect = element.getBoundingClientRect()
       const frameRect = element.closest('.player-frame').getBoundingClientRect()
-      const buttons = [...element.querySelectorAll(
-        '.libmedia-controls__row > .libmedia-control-button'
-      )]
+      const buttons = [...element.querySelectorAll('.libmedia-controls__row .libmedia-control-button')]
+      const progressRect = element.querySelector('.libmedia-progress').getBoundingClientRect()
 
       return {
         viewportWidth: window.innerWidth,
+        progressHeight: progressRect.height,
         buttonCount: buttons.length,
         playerInsideFrame: playerRect.left >= frameRect.left && playerRect.right <= frameRect.right,
         rowInsideFrame: rowIsInsideFrame(element, frameRect),
@@ -472,6 +586,7 @@ test.describe('mobile controls', () => {
     })
 
     expect(layout.viewportWidth).toBe(375)
+    expect(layout.progressHeight).toBe(28)
     expect(layout.buttonCount).toBe(4)
     expect(layout.playerInsideFrame).toBe(true)
     expect(layout.rowInsideFrame).toBe(true)

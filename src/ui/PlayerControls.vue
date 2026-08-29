@@ -68,6 +68,22 @@ function formatTime(value) {
         <PlayIcon v-else />
       </button>
 
+      <div class="libmedia-controls__volume-group">
+        <button
+          type="button"
+          class="libmedia-control-button"
+          :aria-label="muted ? '取消静音' : '静音'"
+          @click="emit('toggle-mute')"
+        >
+          <MutedIcon v-if="muted" />
+          <VolumeIcon v-else />
+        </button>
+        <PlayerVolume
+          :value="muted ? 0 : volume"
+          @change="emit('volume', $event)"
+        />
+      </div>
+
       <span class="libmedia-controls__time" aria-label="播放时间">
         <span>{{ formatTime(previewTime ?? currentTime) }}</span>
         <span class="libmedia-controls__time-total"> / {{ formatTime(duration) }}</span>
@@ -75,20 +91,6 @@ function formatTime(value) {
 
       <div class="libmedia-controls__spacer" />
       <slot name="extra" />
-
-      <button
-        type="button"
-        class="libmedia-control-button"
-        :aria-label="muted ? '取消静音' : '静音'"
-        @click="emit('toggle-mute')"
-      >
-        <MutedIcon v-if="muted" />
-        <VolumeIcon v-else />
-      </button>
-      <PlayerVolume
-        :value="muted ? 0 : volume"
-        @change="emit('volume', $event)"
-      />
 
       <button
         type="button"

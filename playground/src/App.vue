@@ -64,6 +64,7 @@ function handleError(payload) {
         v-if="mounted"
         :src="source"
         wasm-variant="baseline"
+        mini-mode
         @statechange="handleStateChange"
         @timeupdate="handleTimeUpdate"
         @error="handleError"

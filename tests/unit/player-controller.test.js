@@ -55,6 +55,28 @@ describe('player controller', () => {
     ])
   })
 
+  it('publishes the requested position when a paused seek emits no time event', async () => {
+    class SeekWithoutTimeEngine extends FakeEngine {
+      async seek(value) {
+        this.calls.push(['seek', value])
+        this.emit('seeking')
+        this.emit('seeked')
+      }
+    }
+
+    const harness = createHarness({ engine: new SeekWithoutTimeEngine() })
+    await harness.controller.load('paused-hls.m3u8')
+    await harness.controller.pause()
+
+    await harness.controller.seek(44.8)
+
+    expect(harness.events).toContainEqual([
+      'timeupdate',
+      { currentTime: 44.8, duration: 120 }
+    ])
+    expect(harness.controller.state).toBe(PlayerState.PAUSED)
+  })
+
   it('rejects an empty source before creating the engine', async () => {
     const harness = createHarness()
 

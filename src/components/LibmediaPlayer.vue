@@ -6,6 +6,7 @@ import {
   onMounted,
   ref,
   shallowRef,
+  useAttrs,
   watch
 } from 'vue'
 import LibmediaPlayerCore from './LibmediaPlayerCore.vue'
@@ -21,8 +22,11 @@ import PlayerContextMenu from '../ui/PlayerContextMenu.vue'
 import PlayerDiagnostics from '../ui/PlayerDiagnostics.vue'
 import PlayerSettings from '../ui/PlayerSettings.vue'
 import PlayerStatusOverlay from '../ui/PlayerStatusOverlay.vue'
+import { CloseIcon, PauseIcon, PlayIcon, RestoreIcon } from '../ui/icons.js'
 
-defineOptions({ name: 'LibmediaPlayer' })
+defineOptions({ name: 'LibmediaPlayer', inheritAttrs: false })
+
+const attrs = useAttrs()
 
 const props = defineProps({
   src: { type: [String, Object], default: null },
@@ -33,6 +37,7 @@ const props = defineProps({
   poster: { type: String, default: '' },
   controls: { type: Boolean, default: true },
   playsinline: { type: Boolean, default: true },
+  miniMode: { type: Boolean, default: false },
   themeColor: { type: String, default: '' },
   assetBaseUrl: { type: String, default: '' },
   wasmVariant: { type: String, default: 'auto' },
@@ -70,6 +75,11 @@ const fullscreenMode = ref(null)
 const fullscreenDesired = ref(false)
 const replayVisible = ref(false)
 const errorNotice = ref(null)
+const miniAnchorRef = ref(null)
+const miniActive = ref(false)
+const miniDismissed = ref(false)
+const miniSourceVisible = ref(true)
+const miniAnchorStyle = ref(undefined)
 let hideTimer = null
 let feedbackTimer = null
 let stallTimer = null
@@ -88,6 +98,7 @@ let sourceGeneration = 0
 let autoRecoveryBudget = { source: null, time: 0, attempts: 0 }
 let bodyOverflowBeforeFullscreen = null
 let fullscreenEpoch = 0
+let miniObserver = null
 let disposed = false
 
 const PLAYBACK_FEEDBACK_DURATION = 600
@@ -160,6 +171,90 @@ const playbackBusy = computed(() => (
 const fullscreen = computed(() => (
   fullscreenMode.value !== null || fullscreenDesired.value
 ))
+
+function observeMiniTarget(target) {
+  miniObserver?.disconnect()
+  if (target) miniObserver?.observe(target)
+}
+
+async function enterMiniMode() {
+  if (
+    miniActive.value ||
+    !props.miniMode ||
+    miniDismissed.value ||
+    state.value !== PlayerState.PLAYING ||
+    fullscreen.value
+  ) return
+
+  const player = playerElement()
+  if (!player) return
+  const rect = player.getBoundingClientRect()
+  miniAnchorStyle.value = {
+    width: `${rect.width}px`,
+    height: `${rect.height}px`
+  }
+  miniActive.value = true
+  await nextTick()
+  observeMiniTarget(miniAnchorRef.value)
+}
+
+async function exitMiniMode() {
+  if (!miniActive.value) return
+  miniActive.value = false
+  await nextTick()
+  miniAnchorStyle.value = undefined
+  observeMiniTarget(playerElement())
+}
+
+function dismissMiniMode() {
+  miniDismissed.value = true
+  void exitMiniMode()
+}
+
+function restoreMiniMode() {
+  miniDismissed.value = true
+  const reducedMotion = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches
+  miniAnchorRef.value?.scrollIntoView?.({
+    behavior: reducedMotion ? 'auto' : 'smooth',
+    block: 'center'
+  })
+  void exitMiniMode()
+}
+
+function handleMiniIntersection(entries) {
+  const entry = entries[0]
+  if (!entry) return
+  if (entry.target === miniAnchorRef.value) {
+    if (entry.isIntersecting && entry.intersectionRatio > 0) {
+      miniSourceVisible.value = true
+      void exitMiniMode()
+    }
+    return
+  }
+  miniSourceVisible.value = entry.isIntersecting && entry.intersectionRatio > 0
+  if (miniSourceVisible.value) {
+    miniDismissed.value = false
+    return
+  }
+  if (!entry.isIntersecting || entry.intersectionRatio === 0) {
+    void enterMiniMode()
+  }
+}
+
+function setupMiniObserver() {
+  miniObserver?.disconnect()
+  miniObserver = null
+  if (!props.miniMode) {
+    miniDismissed.value = false
+    miniSourceVisible.value = true
+    void exitMiniMode()
+    return
+  }
+  if (typeof IntersectionObserver !== 'function') return
+  miniObserver = new IntersectionObserver(handleMiniIntersection, { threshold: 0 })
+  observeMiniTarget(playerElement())
+}
 
 function clearHideTimer() {
   if (hideTimer !== null) {
@@ -346,6 +441,10 @@ function handleEvent(name, payload) {
       if (payload.state === PlayerState.PLAYING) {
         replayVisible.value = false
         failedPlaybackContext = null
+        if (!miniSourceVisible.value) void enterMiniMode()
+      }
+      if ([PlayerState.ENDED, PlayerState.STOPPED].includes(payload.state)) {
+        void exitMiniMode()
       }
       if (controlsAutoHideStates.has(state.value)) scheduleHide()
       else {
@@ -622,6 +721,9 @@ function handlePointerActivity() {
 function handlePointerDown(event) {
   lastInteractionWasKeyboard = false
   revealOnlySurfaceClick = !controlsVisible.value && isSurfaceEvent(event)
+  if (isSurfaceEvent(event) && event.pointerType !== 'touch') {
+    coreRef.value?.$el?.focus?.({ preventScroll: true })
+  }
   showControls()
 }
 
@@ -837,6 +939,8 @@ watch(() => props.controls, (enabled) => {
   clearHideTimer()
 })
 
+watch(() => props.miniMode, setupMiniObserver)
+
 watch(() => props.src, (source, previousSource) => {
   if (sameSource(source, previousSource)) return
   invalidateRecovery({ clearFailed: true, resetBudget: true })
@@ -942,7 +1046,13 @@ function handleKeydown(event) {
     'button, input, select, textarea, [contenteditable="true"]'
   )
   const key = event.key.toLowerCase()
-  if (editing && key !== 'escape') return
+  const seekKeyOnButton = editing?.matches('button') && [
+    'arrowleft',
+    'arrowright',
+    'j',
+    'l'
+  ].includes(key)
+  if (editing && key !== 'escape' && !seekKeyOnButton) return
 
   const actions = {
     ' ': togglePlayback,
@@ -999,6 +1109,7 @@ onMounted(() => {
   disposed = false
   document.addEventListener('fullscreenchange', syncFullscreenState)
   document.addEventListener('webkitfullscreenchange', syncFullscreenState)
+  setupMiniObserver()
 })
 
 onBeforeUnmount(() => {
@@ -1012,13 +1123,23 @@ onBeforeUnmount(() => {
   clearErrorNoticeTimer()
   document.removeEventListener('fullscreenchange', syncFullscreenState)
   document.removeEventListener('webkitfullscreenchange', syncFullscreenState)
+  miniObserver?.disconnect()
+  miniObserver = null
   if (fullscreenMode.value === 'pseudo') restorePageOverflow()
   else void exitNativeFullscreen()
 })
 </script>
 
 <template>
+  <div
+    ref="miniAnchorRef"
+    v-show="miniActive"
+    class="libmedia-mini-anchor"
+    :style="miniAnchorStyle"
+    aria-hidden="true"
+  />
   <LibmediaPlayerCore
+    v-bind="attrs"
     ref="coreRef"
     v-slot="core"
     class="libmedia-player"
@@ -1026,7 +1147,8 @@ onBeforeUnmount(() => {
       'libmedia-player--controls-hidden': controls && !controlsVisible,
       'libmedia-player--settings-open': settingsOpen,
       'libmedia-player--fullscreen': fullscreenMode === 'native',
-      'libmedia-player--pseudo-fullscreen': fullscreenMode === 'pseudo'
+      'libmedia-player--pseudo-fullscreen': fullscreenMode === 'pseudo',
+      'libmedia-player--mini': miniActive
     }"
     :style="themeStyle"
     :src="src"
@@ -1116,6 +1238,34 @@ onBeforeUnmount(() => {
         <slot name="controls-extra" :state="state" />
       </template>
     </PlayerControls>
+
+    <div v-if="miniActive" class="libmedia-mini" @click.stop>
+      <button
+        type="button"
+        class="libmedia-mini__button libmedia-mini__toggle"
+        :aria-label="visualPlaying ? '暂停' : '播放'"
+        @click="togglePlayback"
+      >
+        <PauseIcon v-if="visualPlaying" />
+        <PlayIcon v-else />
+      </button>
+      <button
+        type="button"
+        class="libmedia-mini__button libmedia-mini__restore"
+        aria-label="返回视频位置"
+        @click="restoreMiniMode"
+      >
+        <RestoreIcon />
+      </button>
+      <button
+        type="button"
+        class="libmedia-mini__button libmedia-mini__close"
+        aria-label="关闭小窗"
+        @click="dismissMiniMode"
+      >
+        <CloseIcon />
+      </button>
+    </div>
 
     <PlayerSettings
       v-if="controls"

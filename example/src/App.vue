@@ -158,6 +158,8 @@ onBeforeUnmount(() => {
         wasm-variant="baseline"
         controls
         playsinline
+        mini-mode
+        loop
         @ready="handleReady"
         @statechange="handleStateChange"
         @timeupdate="handleTimeUpdate"

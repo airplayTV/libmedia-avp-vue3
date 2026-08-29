@@ -117,6 +117,7 @@ function openFile(event) {
 | `muted` / `volume` | `boolean` / `number` | `false` / `1` | 音量范围 `[0, 1]` |
 | `loop` / `controls` | `boolean` | `false` / `true` | 循环和内置控件 |
 | `poster` | `string` | `''` | 海报 URL |
+| `miniMode` | `boolean` | `false` | 播放中离开视口时显示可关闭、可返回原位置的 Mini 播放器 |
 | `themeColor` | `string` | `''` | 控件主题色；未传入时使用 `--libmedia-accent`，默认信号绿 `#22c55e` |
 | `assetBaseUrl` | `string` | Vite 插件注入值 | 本地资源或固定版本 CDN 根路径 |
 | `wasmVariant` | `auto \| baseline \| simd \| atomic` | `auto` | 能力不满足时安全降级 |
@@ -133,6 +134,8 @@ function openFile(event) {
 完整播放器在 `controls=true` 时提供以下内置交互：
 
 - 左键点击视频画面切换播放/暂停；快速连续点击会按最后一次点击的目标状态合并命令，不会重复调用 `play()`；加载中、错误和未加载状态不会误触发播放。
+- 播放器或播放控件获得焦点后，`←` / `→` 快退或快进 5 秒，`J` / `L` 快退或快进 10 秒；进度和音量滑块保留自身方向键行为。
+- `miniMode=true` 时，播放中的视频完全离开视口后自动悬浮；暂停时保留小窗，原位置重新可见、点击关闭或播放结束时退出。
 - 右键点击视频画面打开自定义菜单，可查看视频信息和最近 100 条播放日志。
 - 右键菜单支持方向键、`Home`、`End`、`Enter` 和 `Escape`；关闭诊断面板后焦点返回播放器。
 

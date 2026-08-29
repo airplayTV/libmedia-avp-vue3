@@ -62,6 +62,7 @@ export class PlayerController {
   #volume = 1
   #volumeBeforeMute = 1
   #muted = false
+  #timeEventVersion = 0
   #destroying = false
   #destroyPromise = null
 
@@ -179,7 +180,16 @@ export class PlayerController {
     } catch (error) {
       return Promise.reject(error)
     }
-    return this.#enqueueCurrent('seek', (engine) => engine.seek(engineTime))
+    return this.#enqueueCurrent('seek', async (engine) => {
+      const timeEventVersion = this.#timeEventVersion
+      await engine.seek(engineTime)
+      if (this.#timeEventVersion === timeEventVersion) {
+        this.#emit('timeupdate', {
+          currentTime: engineTimeToSeconds(engineTime),
+          duration: this.#getDuration()
+        })
+      }
+    })
   }
 
   setVolume(volume) {
@@ -441,6 +451,7 @@ export class PlayerController {
         }
         break
       case 'time':
+        this.#timeEventVersion += 1
         this.#emit('timeupdate', {
           currentTime: engineTimeToSeconds(payload[0]),
           duration: this.#getDuration()

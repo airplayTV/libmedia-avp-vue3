@@ -36,32 +36,150 @@
 }
 
 .libmedia-player:fullscreen,
-.libmedia-player:-webkit-full-screen,
 .libmedia-player--pseudo-fullscreen {
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  max-height: none;
-  aspect-ratio: auto;
-  border-radius: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  background: #000;
+}
+
+.libmedia-player:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
   background: #000;
 }
 
 .libmedia-player--pseudo-fullscreen {
-  position: fixed;
-  z-index: 2147483647;
-  inset: 0;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  inset: 0 !important;
+  margin: 0 !important;
 }
 
 .libmedia-player:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--libmedia-accent) 75%, white);
 }
 
+.libmedia-mini-anchor {
+  max-width: 100%;
+}
+
+.libmedia-player--mini {
+  position: fixed !important;
+  z-index: 2147483000 !important;
+  right: 16px !important;
+  bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  width: min(360px, calc(100vw - 32px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  aspect-ratio: 16 / 9 !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38), 0 4px 14px rgba(0, 0, 0, 0.24);
+}
+
+.libmedia-player--mini .libmedia-controls,
+.libmedia-player--mini .libmedia-settings,
+.libmedia-player--mini .libmedia-context-menu,
+.libmedia-player--mini .libmedia-diagnostics,
+.libmedia-player--mini .libmedia-error-notice {
+  display: none;
+}
+
+.libmedia-mini {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  pointer-events: none;
+}
+
+.libmedia-mini__button {
+  position: absolute;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(7, 10, 16, 0.74);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.libmedia-mini__button:hover {
+  background: rgba(7, 10, 16, 0.9);
+}
+
+.libmedia-mini__button:active {
+  transform: scale(0.94);
+}
+
+.libmedia-mini__button:focus-visible {
+  outline: 2px solid var(--libmedia-focus);
+  outline-offset: 2px;
+}
+
+.libmedia-mini__button .libmedia-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.libmedia-mini__toggle {
+  bottom: 10px;
+  left: 10px;
+}
+
+.libmedia-mini__restore {
+  top: 10px;
+  left: 10px;
+}
+
+.libmedia-mini__close {
+  top: 10px;
+  right: 10px;
+}
+
+@media (max-width: 640px) {
+  .libmedia-player--mini {
+    right: 12px !important;
+    bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+    border-radius: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .libmedia-mini__button {
+    transition: none;
+  }
+}
+
 .libmedia-icon {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
 .libmedia-controls {
@@ -70,7 +188,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  padding: 40px 14px max(10px, env(safe-area-inset-bottom));
+  padding: 40px 14px max(4px, env(safe-area-inset-bottom));
   color: var(--libmedia-text);
   background: linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0));
   opacity: 1;
@@ -86,9 +204,9 @@
 
 .libmedia-controls__row {
   display: flex;
-  min-height: 56px;
+  min-height: 48px;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -112,11 +230,14 @@
   transition: background-color 160ms ease, transform 160ms ease;
 }
 
-.libmedia-control-button:hover,
 .libmedia-settings button:hover,
 .libmedia-status-overlay__action:hover {
   color: var(--libmedia-text);
   background: rgba(255, 255, 255, 0.08);
+}
+
+.libmedia-control-button:hover {
+  background: transparent;
 }
 
 .libmedia-control-button:active,
@@ -148,6 +269,11 @@
   color: var(--libmedia-accent);
 }
 
+.libmedia-control-button--primary .libmedia-icon {
+  width: 28px;
+  height: 28px;
+}
+
 .libmedia-control-button--primary:hover {
   color: var(--libmedia-accent);
 }
@@ -168,15 +294,44 @@
   color: var(--libmedia-muted-text);
 }
 
+.libmedia-controls__volume-group {
+  display: flex;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+}
+
 .libmedia-controls__volume {
   position: relative;
   display: flex;
-  width: 86px;
+  visibility: hidden;
+  width: 0;
   height: 44px;
-  flex: 0 0 86px;
+  flex: 0 0 0;
   align-items: center;
+  margin-left: 0;
+  opacity: 0;
   cursor: pointer;
+  pointer-events: none;
   touch-action: none;
+}
+
+.libmedia-controls__volume-group:focus-within,
+.libmedia-controls__volume-group:hover {
+  width: 138px;
+  flex-basis: 138px;
+}
+
+.libmedia-controls__volume-group:focus-within .libmedia-controls__volume,
+.libmedia-controls__volume-group:hover .libmedia-controls__volume {
+  visibility: visible;
+  width: 86px;
+  flex-basis: 86px;
+  margin-left: 8px;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .libmedia-volume__track {
@@ -212,11 +367,17 @@
 .libmedia-progress {
   position: relative;
   display: flex;
-  height: 44px;
+  height: 18px;
   align-items: flex-end;
   margin: 0 0 1px;
   cursor: pointer;
   touch-action: none;
+}
+
+@media (pointer: coarse) {
+  .libmedia-progress {
+    height: 28px;
+  }
 }
 
 .libmedia-progress__track {
@@ -295,7 +456,7 @@
 }
 
 .libmedia-settings {
-  --libmedia-settings-bottom: calc(56px + max(10px, env(safe-area-inset-bottom)));
+  --libmedia-settings-bottom: calc(48px + max(4px, env(safe-area-inset-bottom)));
   position: absolute;
   z-index: 5;
   right: 14px;
@@ -786,6 +947,13 @@
 
   .libmedia-controls__volume {
     display: none;
+  }
+
+  .libmedia-controls__volume-group,
+  .libmedia-controls__volume-group:focus-within,
+  .libmedia-controls__volume-group:hover {
+    width: 44px;
+    flex-basis: 44px;
   }
 
   .libmedia-controls__row {

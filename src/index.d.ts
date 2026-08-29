@@ -42,7 +42,7 @@ export interface AudioTrack extends PlayerTrack {
 
 export interface SubtitleTrack extends PlayerTrack {}
 
-export interface LibmediaPlayerProps {
+export interface LibmediaPlayerCoreProps {
   src?: PlayerSource
   autoplay?: boolean
   muted?: boolean
@@ -51,11 +51,15 @@ export interface LibmediaPlayerProps {
   poster?: string
   controls?: boolean
   playsinline?: boolean
-  themeColor?: string
   assetBaseUrl?: string
   wasmVariant?: WasmVariant
   loadOptions?: Record<string, unknown>
   engineOptions?: Record<string, unknown>
+}
+
+export interface LibmediaPlayerProps extends LibmediaPlayerCoreProps {
+  miniMode?: boolean
+  themeColor?: string
 }
 
 export interface PlayerStateEvent {
@@ -137,7 +141,7 @@ export interface UseLibmediaPlayerResult extends LibmediaPlayerExposed {
 }
 
 export declare const LIBMEDIA_AVP_NAME: 'libmedia-avp-vue3'
-export declare const LIBMEDIA_AVP_VERSION: '0.1.5'
+export declare const LIBMEDIA_AVP_VERSION: '0.1.6'
 export declare const LIBMEDIA_AVP_REPOSITORY: 'https://github.com/airplayTV/libmedia-avp-vue3'
 export declare const LIBMEDIA_AVP_INFO: Readonly<{
   name: typeof LIBMEDIA_AVP_NAME
@@ -182,5 +186,5 @@ export declare function useLibmediaPlayer(
   options?: UseLibmediaPlayerOptions
 ): UseLibmediaPlayerResult
 
-export declare const LibmediaPlayerCore: DefineComponent<LibmediaPlayerProps>
+export declare const LibmediaPlayerCore: DefineComponent<LibmediaPlayerCoreProps>
 export declare const LibmediaPlayer: DefineComponent<LibmediaPlayerProps>

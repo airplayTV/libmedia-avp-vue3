@@ -25,11 +25,11 @@ function createIcon(name, nodes, options = {}) {
 }
 
 export const PlayIcon = createIcon('LibmediaPlayIcon', [
-  { d: 'M8 5v14l11-7z' }
+  { d: 'M4.5 3.7c0-1.14 1.26-1.83 2.23-1.22l14.16 8.3a1.42 1.42 0 0 1 0 2.44l-14.16 8.3C5.76 22.13 4.5 21.44 4.5 20.3V3.7Z' }
 ], { solid: true })
 export const PauseIcon = createIcon('LibmediaPauseIcon', [
-  { tag: 'rect', x: 7, y: 5, width: 4, height: 14, rx: 1 },
-  { tag: 'rect', x: 13, y: 5, width: 4, height: 14, rx: 1 }
+  { tag: 'rect', x: 4.5, y: 3, width: 5.5, height: 18, rx: 2.2 },
+  { tag: 'rect', x: 14, y: 3, width: 5.5, height: 18, rx: 2.2 }
 ], { solid: true })
 export const VolumeIcon = createIcon('LibmediaVolumeIcon', [
   { d: 'M11 5 6 9H3v6h3l5 4Z' },
@@ -60,4 +60,12 @@ export const ExitFullscreenIcon = createIcon('LibmediaExitFullscreenIcon', [
 export const RetryIcon = createIcon('LibmediaRetryIcon', [
   { d: 'M20 11a8 8 0 1 0-2.34 5.66' },
   { d: 'M20 4v7h-7' }
+])
+export const CloseIcon = createIcon('LibmediaCloseIcon', [
+  { d: 'm6 6 12 12' },
+  { d: 'M18 6 6 18' }
+])
+export const RestoreIcon = createIcon('LibmediaRestoreIcon', [
+  { d: 'm9 5-5 5 5 5' },
+  { d: 'M4 10h9a7 7 0 0 1 7 7v2' }
 ])

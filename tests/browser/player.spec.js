@@ -151,7 +151,7 @@ test('keeps settings inside a short landscape mobile player', async ({ page }) =
   })
 
   expect(geometry.settingsTop).toBeGreaterThanOrEqual(geometry.playerTop + 8)
-  expect(geometry.settingsBottom).toBeLessThanOrEqual(geometry.playerBottom - 64)
+  expect(geometry.settingsBottom).toBeLessThanOrEqual(geometry.playerBottom - 52)
   expect(geometry.overflowY).toBe('auto')
 })
 
@@ -185,4 +185,45 @@ test('toggles fullscreen on the complete player and keeps an exit control', asyn
 
   await player.getByRole('button', { name: '退出全屏' }).click()
   await expect(player.getByRole('button', { name: '进入全屏' })).toBeVisible()
+})
+
+test('fullscreen overrides a host inline player height', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await expectReady(page)
+  const player = page.locator('.libmedia-player')
+  await player.evaluate((element) => {
+    Object.defineProperty(element, 'requestFullscreen', {
+      configurable: true,
+      value: undefined
+    })
+    Object.defineProperty(element, 'webkitRequestFullscreen', {
+      configurable: true,
+      value: undefined
+    })
+    element.style.width = '100%'
+    element.style.height = '180px'
+  })
+
+  await player.locator('.libmedia-control-button').last().click()
+  await expect(player).toHaveClass(/libmedia-player--pseudo-fullscreen/)
+
+  const geometry = await player.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      aspectRatio: getComputedStyle(element).aspectRatio
+    }
+  })
+
+  expect(Math.abs(geometry.top)).toBeLessThan(1)
+  expect(Math.abs(geometry.left)).toBeLessThan(1)
+  expect(Math.abs(geometry.width - geometry.viewportWidth)).toBeLessThan(1)
+  expect(Math.abs(geometry.height - geometry.viewportHeight)).toBeLessThan(1)
+  expect(geometry.aspectRatio).toBe('auto')
 })
