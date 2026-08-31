@@ -5,8 +5,12 @@ export class FakeEngine {
   status = 0
   volume = 1
   playbackRate = 1
+  suspended = false
+  hasAudioStream = true
+  emitResumeWhenSuspended = true
   loadImpl = null
   playImpl = null
+  resumeImpl = null
   stopImpl = null
 
   constructor(options = {}) {
@@ -49,8 +53,28 @@ export class FakeEngine {
 
   async play(options) {
     this.calls.push(['play', options])
-    await this.playImpl?.(options)
     this.emit('playing')
+    await this.playImpl?.(options)
+    if (
+      this.suspended &&
+      this.hasAudioStream &&
+      this.emitResumeWhenSuspended
+    ) {
+      this.emit('resume')
+    }
+  }
+
+  hasAudio() {
+    return this.hasAudioStream
+  }
+
+  isSuspended() {
+    return this.suspended
+  }
+
+  async resume() {
+    this.calls.push(['resume'])
+    await this.resumeImpl?.()
   }
 
   async pause() {

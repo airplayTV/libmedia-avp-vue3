@@ -165,6 +165,70 @@ describe('player controller', () => {
     expect(engine.calls.filter(([name]) => name === 'play')).toHaveLength(1)
   })
 
+  it('resumes a suspended audio context before starting playback', async () => {
+    const engine = new FakeEngine()
+    engine.suspended = true
+    engine.resumeImpl = async () => {
+      engine.suspended = false
+    }
+    const harness = createHarness({ engine })
+    await harness.controller.load('movie.mp4')
+
+    await harness.controller.play()
+
+    expect(engine.calls.slice(-2)).toEqual([
+      ['resume'],
+      ['play', undefined]
+    ])
+    expect(harness.controller.state).toBe(PlayerState.PLAYING)
+  })
+
+  it('stops playback when the engine requires a gesture instead of accepting fake play', async () => {
+    const engine = new FakeEngine()
+    engine.suspended = true
+    const harness = createHarness({ engine })
+    await harness.controller.load('movie.mp4')
+
+    await expect(harness.controller.play()).rejects.toMatchObject({
+      code: 'AUTOPLAY_BLOCKED',
+      recoverable: true,
+      requiresUserGesture: true
+    })
+    expect(engine.calls.filter(([name]) => name === 'resume')).toHaveLength(1)
+    expect(engine.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+    expect(engine.calls.filter(([name]) => name === 'pause')).toHaveLength(1)
+    expect(harness.controller.state).toBe(PlayerState.PAUSED)
+  })
+
+  it('allows an MSE fallback that plays while the shared audio context stays suspended', async () => {
+    const engine = new FakeEngine()
+    engine.suspended = true
+    engine.emitResumeWhenSuspended = false
+    const harness = createHarness({ engine })
+    await harness.controller.load('hdr-video.mp4')
+
+    await harness.controller.play()
+
+    expect(engine.calls.filter(([name]) => name === 'resume')).toHaveLength(1)
+    expect(engine.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+    expect(engine.calls.filter(([name]) => name === 'pause')).toHaveLength(0)
+    expect(harness.controller.state).toBe(PlayerState.PLAYING)
+  })
+
+  it('does not block video-only playback on a shared suspended audio context', async () => {
+    const engine = new FakeEngine()
+    engine.suspended = true
+    engine.hasAudioStream = false
+    const harness = createHarness({ engine })
+    await harness.controller.load('silent-video.mp4')
+
+    await harness.controller.play()
+
+    expect(engine.calls.filter(([name]) => name === 'resume')).toHaveLength(0)
+    expect(engine.calls.filter(([name]) => name === 'play')).toHaveLength(1)
+    expect(harness.controller.state).toBe(PlayerState.PLAYING)
+  })
+
   it('restores the pre-seek state after duplicate seeking events', async () => {
     const harness = createHarness()
     await harness.controller.load('movie.mp4')

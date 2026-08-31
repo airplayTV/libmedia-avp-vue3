@@ -6,7 +6,7 @@ import { engineTimeToSeconds, secondsToEngineTime } from './time.js'
 
 const engineEvents = [
   'loading', 'loaded', 'playing', 'paused', 'stopped', 'ended',
-  'seeking', 'seeked', 'time', 'error', 'timeout', 'volumeChange'
+  'seeking', 'seeked', 'time', 'error', 'timeout', 'volumeChange', 'resume'
 ]
 
 const retryableErrorCodes = new Set([
@@ -63,6 +63,7 @@ export class PlayerController {
   #volumeBeforeMute = 1
   #muted = false
   #timeEventVersion = 0
+  #audioPlaybackBlocked = false
   #destroying = false
   #destroyPromise = null
 
@@ -152,7 +153,34 @@ export class PlayerController {
   play(options) {
     return this.#enqueueCurrent('play', async (engine) => {
       try {
+        this.#audioPlaybackBlocked = false
+        const hasAudio = typeof engine.hasAudio !== 'function' || engine.hasAudio()
+        if (
+          hasAudio &&
+          typeof engine.isSuspended === 'function' &&
+          engine.isSuspended()
+        ) {
+          if (typeof engine.resume === 'function') {
+            await engine.resume()
+          }
+        }
         await engine.play(options)
+        if (this.#audioPlaybackBlocked) {
+          try {
+            await engine.pause()
+          } catch (error) {
+            this.#emitDiagnostic('AUTOPLAY_PAUSE_FAILED', error)
+          }
+          throw new PlayerError(
+            'AUTOPLAY_BLOCKED',
+            'Audio playback requires a user gesture',
+            {
+              recoverable: true,
+              requiresUserGesture: true,
+              source: this.#source
+            }
+          )
+        }
       } catch (error) {
         const normalized = normalizeCommandError(error, {
           code: 'MEDIA_LOAD_FAILED',
@@ -464,6 +492,9 @@ export class PlayerController {
           volume: this.#volume,
           muted: this.#muted
         })
+        break
+      case 'resume':
+        this.#audioPlaybackBlocked = true
         break
       case 'timeout':
         this.#reportError(new PlayerError(
