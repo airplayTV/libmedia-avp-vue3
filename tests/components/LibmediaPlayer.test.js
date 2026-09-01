@@ -396,7 +396,7 @@ describe('LibmediaPlayer', () => {
     dialog = harness.wrapper.get('.libmedia-diagnostics')
     expect(dialog.get('[role="tab"][aria-selected="true"]').text()).toBe('播放器信息')
     expect(dialog.text()).toContain('libmedia-avp-vue3')
-    expect(dialog.text()).toContain('0.1.7')
+    expect(dialog.text()).toContain('0.1.8')
     expect(dialog.text()).toContain('AVPlayer / libmedia 版本')
     expect(dialog.text()).toContain('1.3.1')
     expect(dialog.findAll('button').map((button) => button.text())).not.toContain('复制')
